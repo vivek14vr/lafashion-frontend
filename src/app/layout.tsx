@@ -1,0 +1,40 @@
+import type { Metadata } from 'next'
+import { Instrument_Serif, Plus_Jakarta_Sans } from 'next/font/google'
+import { Providers } from '@/components/providers'
+import { SiteFooter } from '@/components/site-footer'
+import { SiteHeader } from '@/components/site-header'
+import './globals.css'
+
+const display = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-display',
+})
+
+const body = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-body',
+})
+
+export const metadata: Metadata = {
+  title: {
+    default: 'LA Fashion Closet by Shagun',
+    template: '%s · LA Fashion Closet',
+  },
+  description:
+    'Where fashion becomes an experience — global runway nights, designer wear, and Fashion Beyond Borders by LA Fashion Closet.',
+}
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" className={`${display.variable} ${body.variable} h-full`} suppressHydrationWarning>
+      <body className="flex min-h-full flex-col antialiased" suppressHydrationWarning>
+        <Providers>
+          <SiteHeader />
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
+        </Providers>
+      </body>
+    </html>
+  )
+}
