@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PAYLOAD_BACKEND_URL = process.env.PAYLOAD_BACKEND_URL || 'http://localhost:3001'
+function backendOrigin(): string {
+  const raw = process.env.PAYLOAD_BACKEND_URL || 'http://localhost:3001'
+  return raw.replace(/\/$/, '')
+}
 
 /**
- * Payload admin (proxied at /admin) loads Next.js chunks from /_next/*.
- * Those must hit the CMS app, not this site's bundles — route by Referer.
+ * Payload admin (proxied at /admin) loads /_next/* chunks that belong to the CMS
+ * app. When the request comes from an admin page, rewrite those to the backend.
  */
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
@@ -18,10 +21,10 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/payload-style.css') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/favicon.svg')
+    pathname === '/favicon.ico' ||
+    pathname === '/favicon.svg'
   ) {
-    return NextResponse.rewrite(new URL(`${pathname}${search}`, PAYLOAD_BACKEND_URL))
+    return NextResponse.rewrite(new URL(`${pathname}${search}`, `${backendOrigin()}/`))
   }
 
   return NextResponse.next()

@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-/** Entry portal — Payload owns the login UI at /admin */
+/**
+ * Prefer a direct CMS admin URL in production (avoids /_next asset proxy issues).
+ * Fallback: same-origin /admin (proxied to Payload).
+ */
 export default function LoginPage() {
-  redirect('/admin')
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || '/admin'
+  redirect(adminUrl)
 }

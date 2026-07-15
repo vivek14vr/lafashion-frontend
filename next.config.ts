@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
 
-const PAYLOAD_BACKEND_URL = process.env.PAYLOAD_BACKEND_URL || 'http://localhost:3001'
+/** Used at build time for rewrites — set the same var on Render for build + runtime. */
+const PAYLOAD_BACKEND_URL = (
+  process.env.PAYLOAD_BACKEND_URL || 'http://localhost:3001'
+).replace(/\/$/, '')
 
 const nextConfig: NextConfig = {
   images: {
@@ -20,6 +23,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lafashion-backend.onrender.com',
+        pathname: '/api/media/**',
       },
     ],
   },
