@@ -41,7 +41,8 @@ export function DestinationCardCarousel({ destination, staggerMs = 0 }: Props) {
                 src={active}
                 alt={`${destination.city} — Fashion Beyond Borders`}
                 fill
-                className="object-contain"
+                unoptimized={active.includes('cloudinary.com')}
+                className="object-cover"
                 sizes="(max-width: 768px) 50vw, 20vw"
               />
             </motion.div>

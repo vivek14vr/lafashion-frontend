@@ -51,12 +51,17 @@ function mediaToUrls(images?: (Media | string)[] | null): string[] {
     .filter((url): url is string => Boolean(url))
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-
 /** Load homepage destination cards from Payload (Admin → Home destination cards). */
 export async function getDestinationCarousels(): Promise<DestinationWithImages[]> {
   try {
-    const response = await fetch(`${API_URL}/api/globals/home-destinations?depth=2`, {
+    // Prefer hitting the CMS directly on the server so localhost API URLs
+    // don't break production SSR when NEXT_PUBLIC_API_URL points at the site.
+    const base =
+      typeof window === 'undefined' && process.env.PAYLOAD_BACKEND_URL
+        ? process.env.PAYLOAD_BACKEND_URL.replace(/\/$/, '')
+        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+
+    const response = await fetch(`${base}/api/globals/home-destinations?depth=2`, {
       next: { revalidate: 30 },
     })
 
