@@ -1,16 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0c0d0f;
+  --background: #0a0b0c;
+  --surface: #111214;
+  --surface-raised: #17181c;
+  --surface-muted: #0e0f11;
   --foreground: #f4f0e8;
   --cream: #f4f0e8;
   --muted: #9a958c;
   --champagne: #d4a574;
-  --ink: #0c0d0f;
+  --ink: #0a0b0c;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
@@ -33,4 +41,53 @@ body {
 
 ::selection {
   background: color-mix(in oklab, var(--champagne) 45%, transparent);
+}
+
+@keyframes world-route-dash {
+  to {
+    stroke-dashoffset: -240;
+  }
+}
+
+.world-route-dash {
+  animation: world-route-dash 16s linear infinite;
+}
+
+@keyframes world-pin-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.05;
+    transform: scale(1.85);
+  }
+}
+
+.world-pin-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: world-pin-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes hero-title-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.hero-title-marquee {
+  display: flex;
+  width: max-content;
+  animation: hero-title-marquee 32s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title-marquee {
+    animation: none;
+  }
 }

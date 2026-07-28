@@ -135,16 +135,8 @@ export function HomePage({ destinations }: { destinations: DestinationWithImages
         ) : null}
       </section>
 
-      <section className="relative overflow-hidden border-y border-white/10">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-30"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=2400&q=80')",
-          }}
-        />
-        <div className="absolute inset-0 bg-[#0c0d0f]/85" />
-        <motion.div {...fadeUp} className="relative mx-auto max-w-6xl px-6 py-28">
+      <section className="border-y border-white/10 bg-[var(--background)]">
+        <motion.div {...fadeUp} className="mx-auto max-w-6xl px-6 py-28">
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--champagne)]">The experience</p>
           <h2 className="mt-4 max-w-3xl font-[family-name:var(--font-display)] text-4xl text-[var(--cream)] md:text-6xl">
             Fashion is more than clothing — it is art, culture, and timeless elegance.
@@ -234,7 +226,7 @@ export function HomePage({ destinations }: { destinations: DestinationWithImages
         )}
       </section>
 
-      <section className="border-t border-white/10 bg-[#090a0b]">
+      <section className="border-t border-white/10 bg-[var(--background)]">
         <motion.div
           {...fadeUp}
           className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-20 md:flex-row md:items-end md:justify-between"

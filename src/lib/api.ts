@@ -51,26 +51,54 @@ async function fetchPayload<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function getUpcomingEvents() {
+type EventListOptions = {
+  page?: number
+  limit?: number
+  search?: string
+}
+
+function appendEventSearch(query: URLSearchParams, search: string | undefined, andIndexStart: number) {
+  const term = search?.trim()
+  if (!term) return
+
+  // Nested under and[N]: (title OR venue OR excerpt) contains term
+  const i = andIndexStart
+  query.set(`where[and][${i}][or][0][title][contains]`, term)
+  query.set(`where[and][${i}][or][1][venue][contains]`, term)
+  query.set(`where[and][${i}][or][2][excerpt][contains]`, term)
+}
+
+export async function getUpcomingEvents(options?: EventListOptions) {
+  const page = options?.page ?? 1
+  const limit = options?.limit ?? 20
+  const now = new Date().toISOString()
+  // Filter by date (not stored status) so past dates never appear as upcoming
   const query = new URLSearchParams({
-    'where[and][0][status][equals]': 'upcoming',
+    'where[and][0][date][greater_than_equal]': now,
     'where[and][1][published][equals]': 'true',
     sort: 'date',
     depth: '1',
-    limit: '20',
+    limit: String(limit),
+    page: String(page),
   })
+  appendEventSearch(query, options?.search, 2)
 
   return fetchPayload<PayloadListResponse<EventItem>>(`/api/events?${query}`)
 }
 
-export async function getPastEvents() {
+export async function getPastEvents(options?: EventListOptions) {
+  const page = options?.page ?? 1
+  const limit = options?.limit ?? 20
+  const now = new Date().toISOString()
   const query = new URLSearchParams({
-    'where[and][0][status][equals]': 'past',
+    'where[and][0][date][less_than]': now,
     'where[and][1][published][equals]': 'true',
     sort: '-date',
     depth: '1',
-    limit: '20',
+    limit: String(limit),
+    page: String(page),
   })
+  appendEventSearch(query, options?.search, 2)
 
   return fetchPayload<PayloadListResponse<EventItem>>(`/api/events?${query}`)
 }
@@ -87,15 +115,44 @@ export async function getEventBySlug(slug: string) {
   return data.docs[0] ?? null
 }
 
-export async function getGalleries() {
+export async function getGalleryForEvent(eventId: string) {
   const query = new URLSearchParams({
-    'where[published][equals]': 'true',
-    sort: '-createdAt',
-    depth: '1',
-    limit: '50',
+    'where[and][0][event][equals]': eventId,
+    'where[and][1][published][equals]': 'true',
+    depth: '0',
+    limit: '1',
   })
 
+  const data = await fetchPayload<PayloadListResponse<GalleryItem>>(`/api/galleries?${query}`)
+  return data.docs[0] ?? null
+}
+
+export async function getGalleries(options?: { page?: number; limit?: number; search?: string }) {
+  const page = options?.page ?? 1
+  const limit = options?.limit ?? 12
+  const query = new URLSearchParams({
+    'where[and][0][published][equals]': 'true',
+    sort: '-createdAt',
+    depth: '1',
+    limit: String(limit),
+    page: String(page),
+  })
+
+  const term = options?.search?.trim()
+  if (term) {
+    query.set('where[and][1][or][0][title][contains]', term)
+    query.set('where[and][1][or][1][location][contains]', term)
+    query.set('where[and][1][or][2][excerpt][contains]', term)
+  }
+
   return fetchPayload<PayloadListResponse<GalleryItem>>(`/api/galleries?${query}`)
+}
+
+/** Prefer live date over stored status (status can lag until a document is re-saved). */
+export function isEventPast(event: Pick<EventItem, 'date' | 'status'>) {
+  const t = new Date(event.date).getTime()
+  if (!Number.isNaN(t)) return t < Date.now()
+  return event.status === 'past'
 }
 
 export async function getGalleryBySlug(slug: string) {

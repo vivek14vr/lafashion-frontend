@@ -3,7 +3,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowUpRight, CalendarDays, MapPin } from 'lucide-react'
-import { formatEventDate, getEventBySlug, getMediaUrl } from '@/lib/api'
+import {
+  formatEventDate,
+  getEventBySlug,
+  getGalleryForEvent,
+  getMediaUrl,
+  isEventPast,
+} from '@/lib/api'
 import { RichText } from '@/components/rich-text'
 
 type Props = {
@@ -26,6 +32,9 @@ export default async function EventDetailPage({ params }: Props) {
 
   if (!event) notFound()
 
+  const past = isEventPast(event)
+  const gallery = past ? await getGalleryForEvent(event.id).catch(() => null) : null
+
   const bannerUrl = getMediaUrl(event.bannerImage)
   const bannerAlt =
     typeof event.bannerImage === 'object' && event.bannerImage?.alt
@@ -39,9 +48,9 @@ export default async function EventDetailPage({ params }: Props) {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-[#0c0d0f] pt-16 md:pt-20">
+      <section className="relative overflow-hidden bg-[var(--background)] pt-16 md:pt-20">
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#17181c] md:aspect-[21/9]">
+          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl bg-[var(--surface-raised)] md:aspect-[21/9]">
             {bannerUrl ? (
               <Image
                 src={bannerUrl}
@@ -52,27 +61,38 @@ export default async function EventDetailPage({ params }: Props) {
                 sizes="(max-width: 1152px) 100vw, 1152px"
               />
             ) : null}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0c0d0f] via-[#0c0d0f]/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--background)] via-[var(--background)]/40 to-transparent" />
           </div>
         </div>
         <div className="relative z-10 mx-auto max-w-6xl px-6 pb-12 pt-8 md:pb-16 md:pt-10">
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--champagne)]">
-            {event.status === 'upcoming' ? 'Upcoming event' : 'Past event'}
+            {past ? 'Past event' : 'Upcoming event'}
           </p>
           <h1 className="mt-4 max-w-4xl font-[family-name:var(--font-display)] text-5xl leading-none text-[var(--cream)] md:text-7xl">
             {event.title}
           </h1>
-          {event.ticketUrl && event.status === 'upcoming' ? (
-            <a
-              href={event.ticketUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-[var(--champagne)] px-6 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[#14120f] transition hover:bg-[var(--cream)]"
-            >
-              Book tickets
-              <ArrowUpRight size={16} />
-            </a>
-          ) : null}
+          <div className="mt-8 flex flex-wrap gap-3">
+            {!past && event.ticketUrl ? (
+              <a
+                href={event.ticketUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--champagne)] px-6 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[#14120f] transition hover:bg-[var(--cream)]"
+              >
+                Book tickets
+                <ArrowUpRight size={16} />
+              </a>
+            ) : null}
+            {past ? (
+              <Link
+                href={gallery ? `/galleries/${gallery.slug}` : '/galleries'}
+                className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--champagne)]/55 px-6 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--champagne)] transition hover:border-[var(--champagne)] hover:bg-[var(--champagne)] hover:text-[#14120f]"
+              >
+                Gallery
+                <ArrowUpRight size={16} />
+              </Link>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -92,9 +112,9 @@ export default async function EventDetailPage({ params }: Props) {
           <RichText content={event.description} />
         </div>
 
-        <aside className="h-fit overflow-hidden border border-white/10 bg-white/[0.03]">
+        <aside className="h-fit overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]">
           {portraitUrl ? (
-            <div className="relative aspect-[3/4] w-full bg-[#17181c]">
+            <div className="relative aspect-[3/4] w-full bg-[var(--surface-raised)]">
               <Image
                 src={portraitUrl}
                 alt={portraitAlt}
@@ -105,22 +125,41 @@ export default async function EventDetailPage({ params }: Props) {
             </div>
           ) : null}
           <div className="p-6">
-            <p className="text-sm uppercase tracking-[0.18em] text-[var(--champagne)]">Tickets</p>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-              Booking is handled on our partner site. You’ll leave LA Fashion Closet to complete checkout.
-            </p>
-            {event.ticketUrl ? (
-              <a
-                href={event.ticketUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--champagne)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[#14120f] transition hover:bg-[var(--cream)]"
-              >
-                Book tickets
-                <ArrowUpRight size={16} />
-              </a>
+            {past ? (
+              <>
+                <p className="text-sm uppercase tracking-[0.18em] text-[var(--champagne)]">Gallery</p>
+                <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
+                  Relive the night through photos from this production.
+                </p>
+                <Link
+                  href={gallery ? `/galleries/${gallery.slug}` : '/galleries'}
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--champagne)]/55 px-5 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--champagne)] transition hover:border-[var(--champagne)] hover:bg-[var(--champagne)] hover:text-[#14120f]"
+                >
+                  {gallery ? 'View gallery' : 'Browse galleries'}
+                  <ArrowUpRight size={16} />
+                </Link>
+              </>
             ) : (
-              <p className="mt-6 text-sm text-[var(--muted)]">Tickets opening soon.</p>
+              <>
+                <p className="text-sm uppercase tracking-[0.18em] text-[var(--champagne)]">Tickets</p>
+                <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
+                  Booking is handled on our partner site. You’ll leave LA Fashion Closet to complete
+                  checkout.
+                </p>
+                {event.ticketUrl ? (
+                  <a
+                    href={event.ticketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--champagne)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[#14120f] transition hover:bg-[var(--cream)]"
+                  >
+                    Book tickets
+                    <ArrowUpRight size={16} />
+                  </a>
+                ) : (
+                  <p className="mt-6 text-sm text-[var(--muted)]">Tickets opening soon.</p>
+                )}
+              </>
             )}
             <Link
               href="/events"

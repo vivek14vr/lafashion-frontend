@@ -32,8 +32,8 @@ export function SiteHeader() {
     <header
       className={`fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,backdrop-filter] duration-300 ${
         scrolled || open
-          ? 'border-white/10 bg-[#0c0d0f]/85 backdrop-blur-xl'
-          : 'border-white/5 bg-[#0c0d0f]/55 backdrop-blur-md'
+          ? 'border-[var(--border-strong)] bg-[var(--surface)]/90 backdrop-blur-xl'
+          : 'border-[var(--border-subtle)] bg-[var(--background)]/60 backdrop-blur-md'
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
