@@ -20,11 +20,11 @@ const fadeUp = {
 export function HomePage({ destinations }: { destinations: DestinationWithImages[] }) {
   const eventsQuery = useQuery({
     queryKey: ['events', 'upcoming', 'home'],
-    queryFn: getUpcomingEvents,
+    queryFn: () => getUpcomingEvents(),
   })
   const galleriesQuery = useQuery({
     queryKey: ['galleries', 'home'],
-    queryFn: getGalleries,
+    queryFn: () => getGalleries(),
   })
 
   const featured = eventsQuery.data?.docs[0] ?? null

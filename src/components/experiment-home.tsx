@@ -71,11 +71,11 @@ function GalleryShowcaseCard({ gallery, index }: { gallery: GalleryItem; index: 
 export function ExperimentHome({ destinations }: { destinations: DestinationWithImages[] }) {
   const eventsQuery = useQuery({
     queryKey: ['events', 'upcoming', 'home'],
-    queryFn: getUpcomingEvents,
+    queryFn: () => getUpcomingEvents({ limit: 2 }),
   })
   const galleriesQuery = useQuery({
     queryKey: ['galleries', 'home'],
-    queryFn: getGalleries,
+    queryFn: () => getGalleries({ limit: 3 }),
   })
 
   const galleries = galleriesQuery.data?.docs.slice(0, 3) ?? []
