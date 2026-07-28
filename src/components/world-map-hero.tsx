@@ -176,6 +176,7 @@ export function WorldMapHero() {
   const sparkleId = useRef(0)
   const dots = worldDots as Dot[]
   const [mapScale, setMapScale] = useState(1)
+  const [mapBoost, setMapBoost] = useState(1)
 
   const points = useMemo(
     () => CITIES.map((c) => ({ ...c, ...project(c.lon, c.lat) })),
@@ -254,11 +255,12 @@ export function WorldMapHero() {
     return () => ro.disconnect()
   }, [dots])
 
-  // Gold sparkles trail around the pointer across the whole hero (cursor stays visible)
+  // Gold sparkles trail around the pointer (desktop only — skipped on touch)
   useEffect(() => {
     const section = sectionRef.current
     const sparkleCanvas = sparkleCanvasRef.current
     if (!section || !sparkleCanvas) return
+    if (window.matchMedia('(max-width: 767px), (pointer: coarse)').matches) return
 
     let raf = 0
     let lastSpawn = 0
@@ -385,6 +387,11 @@ export function WorldMapHero() {
   // Scale map up slightly as the page scrolls (hero stays pinned underneath)
   useEffect(() => {
     let raf = 0
+    const mq = window.matchMedia('(max-width: 767px)')
+    const syncBoost = () => setMapBoost(mq.matches ? 1.3 : 1)
+    syncBoost()
+    mq.addEventListener('change', syncBoost)
+
     const update = () => {
       const progress = Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * 0.85)))
       setMapScale(1 + progress * 0.14)
@@ -398,6 +405,7 @@ export function WorldMapHero() {
     window.addEventListener('resize', onScroll, { passive: true })
     return () => {
       cancelAnimationFrame(raf)
+      mq.removeEventListener('change', syncBoost)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
     }
@@ -422,8 +430,8 @@ export function WorldMapHero() {
 
       <div
         ref={mapStageRef}
-        className="absolute inset-x-[-6%] inset-y-[6%] origin-center will-change-transform md:inset-x-[-2%] md:inset-y-[4%]"
-        style={{ transform: `scale(${mapScale})` }}
+        className="absolute inset-x-[-32%] inset-y-[-4%] origin-center will-change-transform sm:inset-x-[-14%] sm:inset-y-[4%] md:inset-x-[-2%] md:inset-y-[4%]"
+        style={{ transform: `scale(${mapScale * mapBoost})` }}
       >
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />
         <svg
@@ -547,14 +555,16 @@ export function WorldMapHero() {
           {points.map((city) => (
             <g key={city.id}>
               <Pin x={city.x} y={city.y} />
-              <CityLabel
-                x={city.x}
-                y={city.y}
-                dx={city.dx}
-                dy={city.dy}
-                anchor={city.anchor}
-                label={city.label}
-              />
+              <g className="max-sm:opacity-0 sm:opacity-100">
+                <CityLabel
+                  x={city.x}
+                  y={city.y}
+                  dx={city.dx}
+                  dy={city.dy}
+                  anchor={city.anchor}
+                  label={city.label}
+                />
+              </g>
             </g>
           ))}
         </svg>
@@ -568,14 +578,14 @@ export function WorldMapHero() {
         }}
       />
 
-      {/* Scrolling title — behind the lady overlay */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-[7%] z-[6] overflow-hidden md:bottom-[9%]">
+      {/* Scrolling title — above the lady on mobile (gown covers it otherwise); behind on desktop */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-[18%] z-[15] overflow-hidden sm:bottom-[14%] md:bottom-[9%] md:z-[6]">
         <h1 className="sr-only">Fashion Beyond Borders</h1>
         <div className="hero-title-marquee" aria-hidden>
           {[0, 1].map((copy) => (
             <p
               key={copy}
-              className="flex shrink-0 items-center px-4 font-[family-name:var(--font-display)] text-[clamp(4.2rem,14vw,11rem)] leading-none tracking-[0.06em]"
+              className="flex shrink-0 items-center px-3 font-[family-name:var(--font-display)] text-[clamp(2.35rem,12vw,11rem)] leading-none tracking-[0.06em] opacity-90 sm:px-4 sm:text-[clamp(3.6rem,14vw,11rem)] sm:opacity-100"
               style={{
                 backgroundImage:
                   'linear-gradient(180deg, #fff6e4 0%, #f0d7b4 28%, #d4a574 62%, #b88855 100%)',
@@ -586,27 +596,27 @@ export function WorldMapHero() {
                   'drop-shadow(0 2px 2px rgba(0,0,0,0.45)) drop-shadow(0 10px 30px rgba(0,0,0,0.55))',
               }}
             >
-              <span className="px-6 md:px-10">FASHION BEYOND BORDERS</span>
-              <span className="px-6 text-[0.55em] text-[var(--champagne)] opacity-70 md:px-10">·</span>
-              <span className="px-6 md:px-10">FASHION BEYOND BORDERS</span>
-              <span className="px-6 text-[0.55em] text-[var(--champagne)] opacity-70 md:px-10">·</span>
+              <span className="px-4 sm:px-6 md:px-10">FASHION BEYOND BORDERS</span>
+              <span className="px-4 text-[0.55em] text-[var(--champagne)] opacity-70 sm:px-6 md:px-10">·</span>
+              <span className="px-4 sm:px-6 md:px-10">FASHION BEYOND BORDERS</span>
+              <span className="px-4 text-[0.55em] text-[var(--champagne)] opacity-70 sm:px-6 md:px-10">·</span>
             </p>
           ))}
         </div>
       </div>
 
-      {/* Lady overlay — on top of the moving text */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[4%] z-[8] flex items-end justify-center md:top-[2%]">
-        <div className="relative h-full w-full max-w-[960px] origin-bottom scale-[1.0] md:max-w-[1120px] md:scale-[1.02]">
+      {/* Lady overlay — slightly smaller on mobile; asset is 1536×1024 landscape */}
+      <div className="pointer-events-none absolute inset-0 z-[8] overflow-hidden">
+        <div className="absolute inset-x-[0%] bottom-0 h-[74%] sm:inset-x-[-8%] sm:h-[86%] md:inset-x-[-6%] md:h-[88%] lg:inset-x-auto lg:left-1/2 lg:top-0 lg:h-full lg:w-full lg:max-w-[1120px] lg:-translate-x-1/2 xl:max-w-[1200px]">
           <div
-            className="absolute left-1/2 top-[12%] h-[75%] w-[82%] -translate-x-1/2 rounded-full blur-3xl"
+            className="absolute left-1/2 top-[10%] h-[78%] w-[100%] -translate-x-1/2 rounded-full blur-3xl lg:top-[12%] lg:h-[75%] lg:w-[82%]"
             style={{
               background:
                 'radial-gradient(ellipse at center, rgba(240,215,180,0.45) 0%, rgba(212,165,116,0.28) 38%, rgba(184,136,85,0.12) 62%, transparent 78%)',
             }}
           />
           <div
-            className="absolute left-1/2 top-[22%] h-[58%] w-[52%] -translate-x-1/2 rounded-full blur-2xl"
+            className="absolute left-1/2 top-[20%] h-[58%] w-[62%] -translate-x-1/2 rounded-full blur-2xl lg:top-[22%] lg:h-[58%] lg:w-[52%]"
             style={{
               background:
                 'radial-gradient(ellipse at center, rgba(255,244,220,0.35) 0%, rgba(232,201,160,0.18) 50%, transparent 75%)',
@@ -617,26 +627,26 @@ export function WorldMapHero() {
             alt=""
             fill
             priority
-            sizes="(max-width: 768px) 100vw, 1240px"
-            className="relative z-[1] object-contain object-bottom drop-shadow-[0_0_40px_rgba(212,165,116,0.35)]"
+            sizes="(max-width: 1024px) 110vw, 1240px"
+            className="relative z-[1] object-cover object-[center_18%] drop-shadow-[0_0_40px_rgba(212,165,116,0.35)] lg:object-contain lg:object-bottom"
           />
-          <div className="absolute inset-x-0 bottom-0 z-[2] h-24 bg-gradient-to-t from-[#050506] via-[#050506]/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 z-[2] h-24 bg-gradient-to-t from-[#050506] via-[#050506]/55 to-transparent sm:h-28" />
         </div>
       </div>
 
       <canvas
         ref={sparkleCanvasRef}
-        className="pointer-events-none absolute inset-0 z-30"
+        className="pointer-events-none absolute inset-0 z-30 hidden touch-none md:block"
         aria-hidden
       />
 
       {/* Logo — sits on the lower gown */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-[14%] z-20 flex justify-center px-4 md:bottom-[16%]">
+      <div className="pointer-events-none absolute inset-x-0 bottom-[6%] z-20 flex justify-center px-4 sm:bottom-[12%] md:bottom-[16%]">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-          className="w-[min(48vw,220px)] sm:w-[250px] md:w-[280px]"
+          className="w-[min(42vw,156px)] sm:w-[min(46vw,220px)] md:w-[280px]"
         >
           <Image
             src="/banner_title.png"
@@ -650,27 +660,29 @@ export function WorldMapHero() {
         </motion.div>
       </div>
 
-      {/* CTAs at lady's waist + tagline below */}
-      <div className="absolute inset-x-0 top-[48%] z-20 flex flex-col items-center px-6 md:top-[50%]">
+      {/* CTAs + tagline — compact, higher on mobile so map stays readable behind */}
+      <div className="absolute inset-x-0 top-[48%] z-20 flex flex-col items-center px-6 sm:top-[44%] sm:px-6 md:top-[50%]">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="flex flex-wrap items-center justify-center gap-3 md:gap-4"
+          className="flex w-full max-w-[15.5rem] flex-col items-stretch gap-1.5 sm:max-w-none sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 md:gap-4"
         >
           <Link
             href="/events"
-            className="inline-flex items-center gap-2 rounded-full bg-[var(--champagne)] px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.14em] text-[#14120f] shadow-[0_0_40px_rgba(212,165,116,0.28)] transition hover:bg-[var(--cream)]"
+            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--champagne)] px-3.5 py-2 text-[9px] font-semibold uppercase tracking-[0.11em] text-[#14120f] shadow-[0_0_28px_rgba(212,165,116,0.28)] transition hover:bg-[var(--cream)] sm:gap-2 sm:px-7 sm:py-3.5 sm:text-sm sm:tracking-[0.14em]"
           >
             Upcoming events
-            <ArrowUpRight size={16} />
+            <ArrowUpRight size={12} className="sm:hidden" />
+            <ArrowUpRight size={16} className="hidden sm:block" />
           </Link>
           <Link
             href="/galleries"
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--champagne)]/55 bg-[#0c0d0f]/55 px-7 py-3.5 text-sm uppercase tracking-[0.14em] text-[var(--cream)] backdrop-blur-sm transition hover:border-[var(--champagne)] hover:text-[var(--champagne)]"
+            className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--champagne)]/55 bg-[#0c0d0f]/55 px-3.5 py-2 text-[9px] uppercase tracking-[0.11em] text-[var(--cream)] backdrop-blur-sm transition hover:border-[var(--champagne)] hover:text-[var(--champagne)] sm:gap-2 sm:px-7 sm:py-3.5 sm:text-sm sm:tracking-[0.14em]"
           >
             Our gallery
-            <ArrowUpRight size={16} />
+            <ArrowUpRight size={12} className="sm:hidden" />
+            <ArrowUpRight size={16} className="hidden sm:block" />
           </Link>
         </motion.div>
 
@@ -678,7 +690,7 @@ export function WorldMapHero() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.28 }}
-          className="mt-5 text-center text-[12px] font-medium uppercase tracking-[0.34em] text-white md:mt-6 md:text-[13px]"
+          className="mt-1 max-w-[17rem] text-center text-[10px] font-medium uppercase leading-snug tracking-[0.14em] text-white/95 sm:mt-5 sm:max-w-none sm:text-[12px] sm:tracking-[0.34em] md:mt-6 md:text-[13px]"
           style={{
             textShadow:
               '0 0 12px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,1), 0 2px 8px rgba(0,0,0,0.9), 0 0 24px rgba(0,0,0,0.7)',

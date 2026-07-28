@@ -102,22 +102,22 @@ export function UpcomingEventsSection({ events, loading }: Props) {
   const latest = events.slice(0, 2)
 
   return (
-    <section className="bg-[var(--background)] px-4 py-20 md:px-6 md:py-24">
+    <section className="bg-[var(--background)] px-4 py-14 sm:py-20 md:px-6 md:py-24">
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-12 max-w-2xl md:mb-14"
+          className="mb-8 max-w-2xl sm:mb-12 md:mb-14"
         >
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--champagne)]">
             Next on the calendar
           </p>
-          <h2 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-[var(--cream)] md:text-5xl">
+          <h2 className="mt-2 font-[family-name:var(--font-display)] text-[1.75rem] leading-tight text-[var(--cream)] sm:text-3xl md:text-5xl">
             Upcoming nights
           </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-[var(--muted)]">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)] sm:mt-4 sm:text-[15px]">
             Two dates worth dressing for — book early, arrive ready for the room.
           </p>
         </motion.div>
@@ -126,8 +126,10 @@ export function UpcomingEventsSection({ events, loading }: Props) {
           <p className="text-[var(--muted)]">Loading events…</p>
         ) : latest.length > 0 ? (
           <div
-            className={`mx-auto grid gap-6 md:gap-8 ${
-              latest.length === 1 ? 'max-w-md md:max-w-lg' : 'md:grid-cols-2'
+            className={`mx-auto grid gap-5 sm:gap-6 md:gap-8 ${
+              latest.length === 1
+                ? 'max-w-sm sm:max-w-md md:max-w-lg'
+                : 'max-w-md sm:max-w-none sm:grid-cols-2'
             }`}
           >
             {latest.map((event, index) => (
@@ -135,7 +137,7 @@ export function UpcomingEventsSection({ events, loading }: Props) {
             ))}
           </div>
         ) : (
-          <div className="border border-white/10 px-6 py-14 text-center">
+          <div className="border border-white/10 px-5 py-12 text-center sm:px-6 sm:py-14">
             <p className="text-[var(--muted)]">No upcoming events yet. Check back soon.</p>
             <Link
               href="/events"
@@ -147,10 +149,10 @@ export function UpcomingEventsSection({ events, loading }: Props) {
         )}
 
         {events.length > 0 ? (
-          <div className="mt-12 text-center md:mt-14">
+          <div className="mt-10 text-center sm:mt-12 md:mt-14">
             <Link
               href="/events"
-              className="inline-flex items-center gap-2 text-sm uppercase tracking-[0.16em] text-[var(--cream)]/70 transition hover:text-[var(--champagne)]"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--cream)]/70 transition hover:text-[var(--champagne)] sm:text-sm"
             >
               See all upcoming events
               <ArrowUpRight size={16} />

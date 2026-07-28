@@ -86,6 +86,12 @@ body {
   animation: hero-title-marquee 32s linear infinite;
 }
 
+@media (max-width: 639px) {
+  .hero-title-marquee {
+    animation-duration: 22s;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-title-marquee {
     animation: none;

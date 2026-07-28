@@ -10,7 +10,6 @@ import {
   getMediaUrl,
   isEventPast,
 } from '@/lib/api'
-import { RichText } from '@/components/rich-text'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -108,8 +107,9 @@ export default async function EventDetailPage({ params }: Props) {
               {event.venue}
             </span>
           </div>
-          <p className="mt-8 text-lg leading-relaxed text-[var(--cream)]/85">{event.excerpt}</p>
-          <RichText content={event.description} />
+          <p className="mt-8 whitespace-pre-line text-lg leading-relaxed text-[var(--cream)]/85">
+            {event.excerpt}
+          </p>
         </div>
 
         <aside className="h-fit overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]">

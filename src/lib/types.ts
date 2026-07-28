@@ -30,10 +30,9 @@ export type EventItem = {
   date: string
   venue: string
   excerpt: string
-  description?: LexicalContent
   ticketUrl?: string | null
   status: 'upcoming' | 'past'
-  published?: boolean
+  _status?: 'draft' | 'published'
   portraitImage?: Media | string | null
   bannerImage?: Media | string | null
 }

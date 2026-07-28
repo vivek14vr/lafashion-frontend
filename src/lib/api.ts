@@ -75,7 +75,7 @@ export async function getUpcomingEvents(options?: EventListOptions) {
   // Filter by date (not stored status) so past dates never appear as upcoming
   const query = new URLSearchParams({
     'where[and][0][date][greater_than_equal]': now,
-    'where[and][1][published][equals]': 'true',
+    'where[and][1][_status][equals]': 'published',
     sort: 'date',
     depth: '1',
     limit: String(limit),
@@ -92,7 +92,7 @@ export async function getPastEvents(options?: EventListOptions) {
   const now = new Date().toISOString()
   const query = new URLSearchParams({
     'where[and][0][date][less_than]': now,
-    'where[and][1][published][equals]': 'true',
+    'where[and][1][_status][equals]': 'published',
     sort: '-date',
     depth: '1',
     limit: String(limit),
@@ -106,7 +106,7 @@ export async function getPastEvents(options?: EventListOptions) {
 export async function getEventBySlug(slug: string) {
   const query = new URLSearchParams({
     'where[and][0][slug][equals]': slug,
-    'where[and][1][published][equals]': 'true',
+    'where[and][1][_status][equals]': 'published',
     depth: '2',
     limit: '1',
   })
@@ -176,4 +176,73 @@ export function formatEventDate(date: string) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(date))
+}
+
+export type RegistrationPayload = {
+  title?: string
+  firstName: string
+  lastName: string
+  phone: string
+  email: string
+  instagramUrl: string
+  gender: string
+  genderOther?: string
+  city: string
+  state: string
+  height: string
+  weight: string
+  bustChest: string
+  waist: string
+  hips: string
+  dressSize: string
+  suitSize: string
+  shoeSize: string
+  runwayExperience: string
+  locations: string[]
+  publishedModel: string
+  publishedWhere?: string
+  agencyStatus: string
+  isMinor: string
+  consentUnpaid: boolean
+  consentExpenses: boolean
+  consentCredit: boolean
+  consentLikeness: boolean
+  consentRelease: boolean
+  signatureName: string
+  signatureDate: string
+}
+
+export async function submitRegistration(data: RegistrationPayload) {
+  const response = await fetch(`${API_URL}/api/registrations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    cache: 'no-store',
+  })
+
+  const body = (await response.json().catch(() => null)) as
+    | {
+        message?: string
+        errors?: Array<{
+          message?: string
+          data?: { errors?: Array<{ message?: string; label?: string }> }
+        }>
+      }
+    | null
+
+  if (!response.ok) {
+    const top = body?.errors?.[0]
+    const fieldErrors = top?.data?.errors
+      ?.map((e) => e.message)
+      .filter(Boolean)
+      .slice(0, 3)
+    const detail =
+      (fieldErrors && fieldErrors.length > 0 ? fieldErrors.join(' ') : null) ||
+      top?.message ||
+      body?.message ||
+      `Could not submit registration (${response.status})`
+    throw new Error(detail)
+  }
+
+  return body
 }
