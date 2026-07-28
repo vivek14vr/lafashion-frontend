@@ -132,44 +132,6 @@ export function ModelRegistrationForm() {
     (value: FormState[K]) =>
       setForm((prev) => ({ ...prev, [key]: value }))
 
-  const fillTestData = () => {
-    setError(null)
-    setDone(false)
-    setForm({
-      title: 'ms',
-      firstName: 'Aria',
-      lastName: 'Sharma',
-      phone: '+1 310 555 0198',
-      email: 'aria.sharma.test@example.com',
-      instagramUrl: 'https://instagram.com/aria.sharma.test',
-      gender: 'female',
-      genderOther: '',
-      city: 'Los Angeles',
-      state: 'California',
-      height: `5'8"`,
-      weight: '125',
-      bustChest: '34',
-      waist: '24',
-      hips: '35',
-      dressSize: '4',
-      suitSize: 'S',
-      shoeSize: '8',
-      runwayExperience: 'yes',
-      locations: ['la_fw', 'nyfw', 'paris_fw'],
-      publishedModel: 'yes',
-      publishedWhere: 'Vogue India editorial, LA Fashion Week lookbook 2024',
-      agencyStatus: 'non_exclusive',
-      isMinor: 'no',
-      consentUnpaid: true,
-      consentExpenses: true,
-      consentCredit: true,
-      consentLikeness: true,
-      consentRelease: true,
-      signatureName: 'Aria Sharma',
-      signatureDate: todayLocal(),
-    })
-  }
-
   const toggleLocation = (value: string) => {
     setForm((prev) => ({
       ...prev,
@@ -278,16 +240,6 @@ export function ModelRegistrationForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-12">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={fillTestData}
-          className="rounded-full border border-dashed border-[var(--champagne)]/45 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[var(--champagne)]/90 transition hover:border-[var(--champagne)] hover:bg-[var(--champagne)]/10"
-        >
-          Fill test data
-        </button>
-      </div>
-
       {/* Identity */}
       <section className="space-y-5">
         <div>

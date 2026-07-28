@@ -16,10 +16,11 @@ export function FashionBeyondBordersHero({ destinations }: Props) {
     <section className="relative overflow-hidden bg-[#050506] pt-14 md:pt-16">
       <div className="relative mx-1.5 min-h-[58vh] overflow-hidden md:mx-2 md:min-h-[68vh] lg:mx-3">
         <Image
-          src="/backimage.png"
+          src="/backimage.webp"
           alt="Fashion Beyond Borders by LA Fashion Closet"
           fill
           priority
+          unoptimized
           className="object-cover object-top"
           sizes="100vw"
         />

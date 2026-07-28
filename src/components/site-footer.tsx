@@ -8,10 +8,11 @@ export function SiteFooter() {
         <div>
           <div className="relative h-10 w-[200px]">
             <Image
-              src="/logo.png"
+              src="/logo.webp"
               alt="LA Fashion Closet by Shagun"
               fill
               sizes="200px"
+              unoptimized
               className="object-contain object-left"
             />
           </div>

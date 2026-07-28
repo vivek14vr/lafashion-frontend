@@ -622,14 +622,22 @@ export function WorldMapHero() {
                 'radial-gradient(ellipse at center, rgba(255,244,220,0.35) 0%, rgba(232,201,160,0.18) 50%, transparent 75%)',
             }}
           />
-          <Image
-            src="/banner_lady.png"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 1024px) 110vw, 1240px"
-            className="relative z-[1] object-cover object-[center_18%] drop-shadow-[0_0_40px_rgba(212,165,116,0.35)] lg:object-contain lg:object-bottom"
-          />
+          <picture>
+            <source
+              media="(max-width: 1024px)"
+              srcSet="/banner_lady-1200.webp"
+              type="image/webp"
+            />
+            <img
+              src="/banner_lady.webp"
+              alt=""
+              width={1536}
+              height={1024}
+              fetchPriority="high"
+              decoding="async"
+              className="absolute inset-0 z-[1] h-full w-full object-cover object-[center_18%] drop-shadow-[0_0_40px_rgba(212,165,116,0.35)] lg:object-contain lg:object-bottom"
+            />
+          </picture>
           <div className="absolute inset-x-0 bottom-0 z-[2] h-24 bg-gradient-to-t from-[#050506] via-[#050506]/55 to-transparent sm:h-28" />
         </div>
       </div>
@@ -649,12 +657,12 @@ export function WorldMapHero() {
           className="w-[min(42vw,156px)] sm:w-[min(46vw,220px)] md:w-[280px]"
         >
           <Image
-            src="/banner_title.png"
+            src="/banner_title.webp"
             alt="LA Fashion Closet by Shagun"
-            width={1195}
-            height={606}
-            priority
+            width={560}
+            height={284}
             sizes="(max-width: 640px) 48vw, (max-width: 768px) 250px, 280px"
+            unoptimized
             className="h-auto w-full drop-shadow-[0_8px_28px_rgba(0,0,0,0.65),0_0_28px_rgba(212,165,116,0.22)]"
           />
         </motion.div>
