@@ -212,23 +212,68 @@ export type RegistrationPayload = {
   signatureDate: string
 }
 
-export async function submitRegistration(data: RegistrationPayload) {
-  const response = await fetch(`${API_URL}/api/registrations`, {
+export type CommunityRegistrationPayload = {
+  role: string
+  roleOther?: string
+  title?: string
+  firstName: string
+  lastName: string
+  phone: string
+  email: string
+  instagramUrl: string
+  gender: string
+  genderOther?: string
+  city: string
+  state: string
+  locations: string[]
+  isMinor: string
+  consentUnpaid: boolean
+  consentCredit: boolean
+  consentLikeness: boolean
+  consentMedia: boolean
+  signatureName: string
+  signatureDate: string
+}
+
+export type DesignerRegistrationPayload = {
+  title?: string
+  firstName: string
+  lastName: string
+  phone: string
+  email: string
+  looks: string
+  looksOther?: string
+  instagramUrl: string
+  retailCategory: string
+  retailCategoryOther?: string
+  city: string
+  state: string
+  runwayExperience: string
+  locations: string[]
+  isMinor: string
+  consentCredit: boolean
+  consentLikeness: boolean
+  signatureName: string
+  signatureDate: string
+}
+
+type RegistrationErrorBody = {
+  message?: string
+  errors?: Array<{
+    message?: string
+    data?: { errors?: Array<{ message?: string; label?: string }> }
+  }>
+} | null
+
+async function submitRegistrationCollection(path: string, data: unknown) {
+  const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     cache: 'no-store',
   })
 
-  const body = (await response.json().catch(() => null)) as
-    | {
-        message?: string
-        errors?: Array<{
-          message?: string
-          data?: { errors?: Array<{ message?: string; label?: string }> }
-        }>
-      }
-    | null
+  const body = (await response.json().catch(() => null)) as RegistrationErrorBody
 
   if (!response.ok) {
     const top = body?.errors?.[0]
@@ -245,4 +290,16 @@ export async function submitRegistration(data: RegistrationPayload) {
   }
 
   return body
+}
+
+export async function submitRegistration(data: RegistrationPayload) {
+  return submitRegistrationCollection('/api/registrations', data)
+}
+
+export async function submitCommunityRegistration(data: CommunityRegistrationPayload) {
+  return submitRegistrationCollection('/api/community-registrations', data)
+}
+
+export async function submitDesignerRegistration(data: DesignerRegistrationPayload) {
+  return submitRegistrationCollection('/api/designer-registrations', data)
 }

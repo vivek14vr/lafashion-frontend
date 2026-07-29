@@ -30,6 +30,8 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--champagne) 55%, transparent) var(--surface);
 }
 
 body {
@@ -37,6 +39,38 @@ body {
   color: var(--foreground);
   font-family: var(--font-body), system-ui, sans-serif;
   min-height: 100vh;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--champagne) 70%, #f4f0e8),
+    color-mix(in oklab, var(--champagne) 45%, #8a6a45)
+  );
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--champagne) 85%, #f4f0e8),
+    color-mix(in oklab, var(--champagne) 60%, #8a6a45)
+  );
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--surface);
 }
 
 ::selection {
