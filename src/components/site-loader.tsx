@@ -104,32 +104,32 @@ function SiteLoaderOverlay({ onDone }: { onDone: () => void }) {
       />
 
       <motion.div
-        className="relative z-10 flex w-full max-w-sm flex-col items-center px-8"
+        className="relative z-10 flex w-full max-w-lg flex-col items-center px-6 sm:max-w-xl sm:px-8"
         initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.7, ease: easeOut }}
       >
         <motion.div
-          className="relative h-14 w-[220px] sm:h-16 sm:w-[260px]"
-          initial={reduceMotion ? false : { opacity: 0, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          transition={{ duration: 0.85, delay: 0.1, ease: easeOut }}
+          className="relative aspect-[560/284] w-full max-w-[min(88vw,420px)] sm:max-w-[480px]"
+          initial={reduceMotion ? false : { opacity: 0, filter: 'blur(8px)', scale: 0.94 }}
+          animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }}
+          transition={{ duration: 0.9, delay: 0.08, ease: easeOut }}
         >
           <Image
-            src="/logo.webp"
+            src="/banner_title.webp"
             alt="LA Fashion Closet by Shagun"
             fill
             priority
             unoptimized
-            className="object-contain"
+            className="object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
           />
         </motion.div>
 
         <motion.p
-          className="mt-7 text-center text-[10px] uppercase tracking-[0.34em] text-[var(--champagne)]/90 sm:text-[11px]"
+          className="mt-8 text-center text-[10px] uppercase tracking-[0.34em] text-[var(--champagne)]/90 sm:text-[11px]"
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.25, ease: easeOut }}
+          transition={{ duration: 0.65, delay: 0.28, ease: easeOut }}
         >
           Fashion Beyond Borders
         </motion.p>
