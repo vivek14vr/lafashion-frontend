@@ -131,3 +131,8 @@ body {
     animation: none;
   }
 }
+
+html.lafashion-loading,
+html.lafashion-loading body {
+  overflow: hidden;
+}
