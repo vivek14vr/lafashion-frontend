@@ -61,8 +61,11 @@ export async function getDestinationCarousels(): Promise<DestinationWithImages[]
         ? process.env.PAYLOAD_BACKEND_URL.replace(/\/$/, '')
         : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
 
+    // Hard timeout — Render static generation fails after 60s if the CMS is
+    // asleep/unreachable and fetch hangs with no AbortSignal.
     const response = await fetch(`${base}/api/globals/home-destinations?depth=2`, {
       next: { revalidate: 30 },
+      signal: AbortSignal.timeout(8_000),
     })
 
     if (response.ok) {
@@ -78,7 +81,7 @@ export async function getDestinationCarousels(): Promise<DestinationWithImages[]
       }
     }
   } catch {
-    // Fall through to defaults
+    // Fall through to defaults (timeout, network error, cold CMS, etc.)
   }
 
   return DESTINATIONS.map((destination) => ({
