@@ -300,15 +300,28 @@ function AdminAppContent({ section }: { section?: string[] }) {
 
   useEffect(() => {
     let active = true
-    // Payload authenticates with a signed JWT cookie. `/users/me` verifies that
-    // JWT on the backend before returning the current admin user.
-    api('/users/refresh-token', { method: 'POST' })
-      .then(() => api('/users/me'))
+    // Verify the existing session first. Refresh only when Payload explicitly
+    // says the session is unauthorized; network/5xx failures must not log the
+    // user out because those are temporary backend failures.
+    api('/users/me')
+      .catch(async (error) => {
+        if (!(error instanceof Error) || error.message !== 'AUTH_REQUIRED') throw error
+        await api('/users/refresh-token', { method: 'POST' })
+        return api('/users/me')
+      })
       .then(() => {
         if (active) setSessionReady(true)
       })
-      .catch(() => {
-        if (active) window.location.replace('/login')
+      .catch((error) => {
+        if (!active) return
+        if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+          window.location.replace('/login')
+          return
+        }
+        // Keep the shell mounted during a transient API/database outage. The
+        // individual page will show its own request error and can recover on
+        // the next navigation or refresh.
+        setSessionReady(true)
       })
     return () => {
       active = false
@@ -322,7 +335,9 @@ function AdminAppContent({ section }: { section?: string[] }) {
     // HttpOnly; JavaScript never reads or stores it.
     const refreshEvery = 12 * 60 * 60 * 1000
     const timer = window.setInterval(() => {
-      api('/users/refresh-token', { method: 'POST' }).catch(() => window.location.replace('/login'))
+      api('/users/refresh-token', { method: 'POST' }).catch((error) => {
+        if (error instanceof Error && error.message === 'AUTH_REQUIRED') window.location.replace('/login')
+      })
     }, refreshEvery)
 
     return () => window.clearInterval(timer)
