@@ -1,41 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-function backendOrigin(): string {
-  return (process.env.PAYLOAD_BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '')
-}
-
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
   const isLoginRoute = pathname === '/login'
 
   if (!isAdminRoute && !isLoginRoute) return NextResponse.next()
 
-  let authenticated = false
-  try {
-    // Payload's auth cookie contains its signed JWT. The backend verifies the
-    // signature and expiry before returning the current user.
-    const response = await fetch(`${backendOrigin()}/api/users/me`, {
-      headers: { cookie: request.headers.get('cookie') || '' },
-      cache: 'no-store',
-    })
-    const payload = (await response.json().catch(() => null)) as { user?: unknown } | null
-    authenticated = response.ok && Boolean(payload?.user)
-  } catch {
-    // Fail closed for the protected admin surface when the auth service is down.
-    authenticated = false
-  }
-
-  if (isAdminRoute && !authenticated) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  if (isLoginRoute && authenticated) {
-    return NextResponse.redirect(new URL('/admin', request.url))
-  }
-
+  // Authentication is verified client-side by AdminApp through the same-origin
+  // Payload endpoints. Avoid a server-to-server cookie check here: the browser
+  // receives the auth cookie from the login POST, then follows the redirect to
+  // /admin, where the client can present that cookie directly to Nginx/Payload.
   return NextResponse.next()
 }
 
