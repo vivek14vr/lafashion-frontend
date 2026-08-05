@@ -70,6 +70,20 @@ function text(value: unknown): string {
   return String(value)
 }
 
+function relationId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && 'id' in value) return String((value as { id: unknown }).id)
+  return ''
+}
+
+function localDateTime(value: unknown): string {
+  if (!value) return ''
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return ''
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`/api${path}`, { ...init, credentials: 'include', cache: 'no-store' })
   const body = await response.json().catch(() => null)
@@ -143,23 +157,69 @@ function CollectionPage({ slug }: { slug: string }) {
   return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} /><button className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
 }
 
-function EventForm() {
+function RecordDetailPage({ slug, id }: { slug: string; id: string }) {
   const router = useRouter()
   const { startLoading } = useAdminLoader()
-  const [data, setData] = useState({ title: '', date: '', venue: '', excerpt: '', ticketUrl: '', portraitImage: '', bannerImage: '' })
+  const [record, setRecord] = useState<Doc | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    const stopLoading = startLoading('Loading record…')
+    void api(`/${slug}/${id}?depth=2`)
+      .then((data) => { if (active) setRecord(data) })
+      .catch((err) => {
+        if (!active) return
+        if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login')
+        else setError(err instanceof Error ? err.message : 'Could not load this record.')
+      })
+      .finally(stopLoading)
+    return () => { active = false }
+  }, [id, router, slug, startLoading])
+  const entries = record ? Object.entries(record).filter(([key]) => !['id', 'createdAt', 'updatedAt'].includes(key)) : []
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">RECORD</p><h1>{record ? text(record.title || record.email || labels[slug] || slug) : labels[slug] || slug}</h1><p className="admin-muted">Review the complete saved record.</p></div><Link href={`/admin/${slug}`} className="admin-secondary">← Back to list</Link></div>{error ? <p className="admin-error">{error}</p> : null}{record ? <div className="admin-record-details">{entries.map(([key, value]) => <div className="admin-record-details__row" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><pre>{typeof value === 'object' ? JSON.stringify(value, null, 2) : text(value)}</pre></div>)}</div> : null}</>
+}
+
+type EventFormData = { title: string; date: string; venue: string; excerpt: string; ticketUrl: string; portraitImage: string; bannerImage: string }
+
+function EventForm({ id }: { id?: string }) {
+  const router = useRouter()
+  const { startLoading } = useAdminLoader()
+  const [data, setData] = useState<EventFormData>({ title: '', date: '', venue: '', excerpt: '', ticketUrl: '', portraitImage: '', bannerImage: '' })
   const [media, setMedia] = useState<Doc[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { void api('/media?limit=200&sort=-createdAt').then((response) => setMedia(response.docs || [])).catch(() => undefined) }, [])
+  useEffect(() => {
+    let active = true
+    const stopLoading = startLoading(id ? 'Loading event…' : 'Loading event form…')
+    const eventRequest = id ? api(`/events/${id}?depth=1`) : Promise.resolve(null)
+    void Promise.all([api('/media?limit=200&sort=-createdAt'), eventRequest])
+      .then(([mediaResponse, event]) => {
+        if (!active) return
+        setMedia(mediaResponse.docs || [])
+        if (event) setData({
+          title: String(event.title || ''),
+          date: localDateTime(event.date),
+          venue: String(event.venue || ''),
+          excerpt: String(event.excerpt || ''),
+          ticketUrl: String(event.ticketUrl || ''),
+          portraitImage: relationId(event.portraitImage),
+          bannerImage: relationId(event.bannerImage),
+        })
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load the event.'))
+      .finally(stopLoading)
+    return () => { active = false }
+  }, [id, startLoading])
   async function save(event: React.FormEvent) {
-    event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading('Creating event…')
+    event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading(id ? 'Saving event…' : 'Publishing event…')
     try {
-      await api('/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, _status: 'published' }) })
+      await api(id ? `/events/${id}` : '/events', { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, _status: 'published' }) })
       router.replace('/admin/events')
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create event.') } finally { setSaving(false); stopLoading() }
+    } catch (err) { setError(err instanceof Error ? err.message : `Could not ${id ? 'save' : 'create'} event.`) } finally { setSaving(false); stopLoading() }
   }
   const field = (name: keyof typeof data, label: string, type = 'text') => <label className="admin-form"><span>{label}</span><input required={['title', 'date', 'venue', 'excerpt'].includes(name)} type={type} value={data[name]} onChange={(event) => setData((current) => ({ ...current, [name]: event.target.value }))} /></label>
-  return <form className="admin-form admin-event-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Create event</h1><p className="admin-muted">Add and publish a runway night or fashion event to the website.</p></div><button className="admin-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish event'}</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-event-details">{field('title', 'Event title')}{field('date', 'Date & time', 'datetime-local')}{field('venue', 'Venue')}{field('excerpt', 'Summary')}{field('ticketUrl', 'Ticket booking URL')}</div><div className="admin-event-images"><MediaChoice label="Portrait image" required value={data.portraitImage} media={media} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} /><MediaChoice label="Banner image" required value={data.bannerImage} media={media} onChange={(value) => setData((current) => ({ ...current, bannerImage: value }))} /></div><div className="admin-form-actions"><button className="admin-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish event'}</button></div></form>
+  const action = id ? 'Save changes' : 'Publish event'
+  return <form className="admin-form admin-event-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{id ? 'Edit event' : 'Create event'}</h1><p className="admin-muted">{id ? 'Update the event details shown on the public website.' : 'Add and publish a runway night or fashion event to the website.'}</p></div><div className="admin-page-heading__actions">{id ? <Link href="/admin/events" className="admin-secondary">Cancel</Link> : null}<button className="admin-primary" disabled={saving}>{saving ? 'Saving…' : action}</button></div></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-event-details">{field('title', 'Event title')}{field('date', 'Date & time', 'datetime-local')}{field('venue', 'Venue')}{field('excerpt', 'Summary')}{field('ticketUrl', 'Ticket booking URL')}</div><div className="admin-event-images"><MediaChoice label="Portrait image" required value={data.portraitImage} media={media} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} /><MediaChoice label="Banner image" required value={data.bannerImage} media={media} onChange={(value) => setData((current) => ({ ...current, bannerImage: value }))} /></div><div className="admin-form-actions"><button className="admin-primary" disabled={saving}>{saving ? 'Saving…' : action}</button></div></form>
 }
 
 function GalleryForm() {
@@ -397,7 +457,8 @@ function AdminAppContent({ section }: { section?: string[] }) {
   // whole page here made every navigation look like a reload.
   const isNewEvent = slug === 'events' && section?.[1] === 'new'
   const isNewGallery = slug === 'galleries' && section?.[1] === 'new'
-  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{isNewEvent ? <EventForm /> : isNewGallery ? <GalleryForm /> : !slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
+  const recordId = section?.[1] && section[1] !== 'new' ? section[1] : undefined
+  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{isNewEvent ? <EventForm /> : recordId && slug === 'events' ? <EventForm id={recordId} /> : isNewGallery ? <GalleryForm /> : recordId && slug ? <RecordDetailPage slug={slug} id={recordId} /> : !slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
 }
 
 export function AdminApp({ section }: { section?: string[] }) {
