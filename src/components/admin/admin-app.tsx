@@ -27,6 +27,7 @@ const labels: Record<string, string> = {
   registrations: 'Model registrations',
   'community-registrations': 'Community registrations',
   'designer-registrations': 'Designer registrations',
+  'home-destinations': 'Homepage city snaps',
 }
 
 function text(value: unknown): string {
@@ -75,6 +76,56 @@ function CollectionPage({ slug }: { slug: string }) {
   useEffect(() => { void load() }, [slug])
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
   return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load()} /><button className="admin-secondary" onClick={() => void load()}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
+}
+
+type DestinationImage = string | { id: string; filename?: string; url?: string }
+type Destination = { id?: string; city: string; images?: DestinationImage[] }
+
+function HomeDestinationsPage() {
+  const [destinations, setDestinations] = useState<Destination[]>([])
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function load() {
+    try {
+      const data = await api('/globals/home-destinations?depth=2')
+      setDestinations(data.destinations || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load homepage destinations.')
+    }
+  }
+
+  useEffect(() => { void load() }, [])
+
+  async function save() {
+    setSaving(true)
+    setMessage('')
+    setError('')
+    try {
+      await api('/globals/home-destinations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destinations }),
+      })
+      setMessage('Homepage destinations saved.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save homepage destinations.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <>
+    <div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Homepage city snaps</h1><p className="admin-muted">Edit the city labels and review the rotating photos used on the homepage.</p></div><button className="admin-primary" onClick={() => void save()} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button></div>
+    {error ? <p className="admin-error">{error}</p> : null}
+    {message ? <p className="admin-muted">{message}</p> : null}
+    <div className="admin-destination-grid">{destinations.map((destination, index) => <div className="admin-welcome" key={destination.id || index}>
+      <label className="admin-form"><span>City name</span><input value={destination.city || ''} onChange={(event) => setDestinations((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, city: event.target.value } : item))} /></label>
+      <p className="admin-muted">{destination.images?.length || 0} rotating photo{destination.images?.length === 1 ? '' : 's'} attached.</p>
+      {destination.images?.length ? <div className="admin-upload__files">{destination.images.map((image, imageIndex) => <span key={typeof image === 'string' ? image : image.id}>{typeof image === 'string' ? image : image.filename || `Photo ${imageIndex + 1}`}</span>)}</div> : null}
+    </div>)}</div>
+  </>
 }
 
 function MediaPage() {
@@ -126,5 +177,5 @@ export function AdminApp({ section }: { section?: string[] }) {
   // Keep the admin shell mounted while the session is refreshed in the
   // background. Route transitions remount this component, and blocking the
   // whole page here made every navigation look like a reload.
-  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{!slug ? <Overview /> : slug === 'media' ? <MediaPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
+  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{!slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
 }
