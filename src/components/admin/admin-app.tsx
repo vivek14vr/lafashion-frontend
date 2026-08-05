@@ -97,7 +97,8 @@ export function AdminApp({ section }: { section?: string[] }) {
     let active = true
     // Payload authenticates with a signed JWT cookie. `/users/me` verifies that
     // JWT on the backend before returning the current admin user.
-    api('/users/me')
+    api('/users/refresh-token', { method: 'POST' })
+      .then(() => api('/users/me'))
       .then(() => {
         if (active) setSessionReady(true)
       })
@@ -108,6 +109,19 @@ export function AdminApp({ section }: { section?: string[] }) {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!sessionReady) return
+
+    // Renew the Payload JWT well before its 30-day expiry. The token stays
+    // HttpOnly; JavaScript never reads or stores it.
+    const refreshEvery = 12 * 60 * 60 * 1000
+    const timer = window.setInterval(() => {
+      api('/users/refresh-token', { method: 'POST' }).catch(() => window.location.replace('/login'))
+    }, refreshEvery)
+
+    return () => window.clearInterval(timer)
+  }, [sessionReady])
 
   if (!sessionReady) {
     return <main className="admin-session-loading"><span>Verifying secure session…</span></main>
