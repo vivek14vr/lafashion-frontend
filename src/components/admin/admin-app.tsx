@@ -90,6 +90,28 @@ function MediaPage() {
 
 export function AdminApp({ section }: { section?: string[] }) {
   const [open, setOpen] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
   const slug = section?.[0]
+
+  useEffect(() => {
+    let active = true
+    // Payload authenticates with a signed JWT cookie. `/users/me` verifies that
+    // JWT on the backend before returning the current admin user.
+    api('/users/me')
+      .then(() => {
+        if (active) setSessionReady(true)
+      })
+      .catch(() => {
+        if (active) window.location.replace('/login')
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (!sessionReady) {
+    return <main className="admin-session-loading"><span>Verifying secure session…</span></main>
+  }
+
   return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{!slug ? <Overview /> : slug === 'media' ? <MediaPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
 }

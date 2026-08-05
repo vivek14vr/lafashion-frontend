@@ -24,7 +24,8 @@ export function AdminLogin() {
         body: JSON.stringify({ email, password }),
       })
       if (!response.ok) throw new Error('Invalid email or password.')
-      router.replace('/admin')
+      const next = new URLSearchParams(window.location.search).get('next') || '/admin'
+      router.replace(next.startsWith('/admin') ? next : '/admin')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in.')
