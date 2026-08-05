@@ -19,7 +19,8 @@ export async function middleware(request: NextRequest) {
       headers: { cookie: request.headers.get('cookie') || '' },
       cache: 'no-store',
     })
-    authenticated = response.ok
+    const payload = (await response.json().catch(() => null)) as { user?: unknown } | null
+    authenticated = response.ok && Boolean(payload?.user)
   } catch {
     // Fail closed for the protected admin surface when the auth service is down.
     authenticated = false
