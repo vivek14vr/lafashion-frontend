@@ -44,6 +44,30 @@ async function api(path: string, init?: RequestInit) {
   return body
 }
 
+async function compressImage(file: File): Promise<File> {
+  if (!/^image\/(jpeg|webp)$/i.test(file.type) || file.size < 750 * 1024 || typeof createImageBitmap !== 'function') return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const maxDimension = 2400
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) return file
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    const outputType = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg'
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, outputType, 0.82))
+    if (!blob || blob.size >= file.size) return file
+    const extension = outputType === 'image/webp' ? 'webp' : 'jpg'
+    const name = file.name.replace(/\.[^.]+$/, '') + `.${extension}`
+    return new File([blob], name, { type: outputType, lastModified: file.lastModified })
+  } catch {
+    return file
+  }
+}
+
 function Sidebar({ open, close }: { open: boolean; close: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -141,7 +165,8 @@ function HomeDestinationsPage() {
     try {
       const uploadedIds: string[] = []
       for (const file of Array.from(files)) {
-        const uploaded = await api('/media', { method: 'POST', body: (() => { const form = new FormData(); form.append('file', file); return form })() })
+        const uploadedFile = await compressImage(file)
+        const uploaded = await api('/media', { method: 'POST', body: (() => { const form = new FormData(); form.append('file', uploadedFile); return form })() })
         const doc = uploaded.doc || uploaded
         if (doc?.id) {
           uploadedIds.push(doc.id)
@@ -173,7 +198,7 @@ function MediaPage() {
   const [media, setMedia] = useState<ListResponse | null>(null)
   async function load() { setMedia(await api('/media?limit=60&sort=-createdAt').catch(() => null)) }
   useEffect(() => { void load() }, [])
-  async function upload() { if (!files.length) return; setUploading(true); setMessage(''); let completed = 0; try { for (const file of files) { const body = new FormData(); body.append('file', file); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false) } }
+  async function upload() { if (!files.length) return; setUploading(true); setMessage('Optimizing images…'); let completed = 0; try { for (const file of files) { const uploadedFile = await compressImage(file); const body = new FormData(); body.append('file', uploadedFile); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false) } }
   return <><div className="admin-page-heading"><div><p className="admin-eyebrow">ASSETS</p><h1>Media library</h1><p className="admin-muted">Private S3-backed images shared by events, galleries, and homepage cards.</p></div></div><div className="admin-upload"><div><h2>Upload images</h2><p className="admin-muted">Choose one or more files, then confirm with the upload button.</p></div><label className="admin-file-picker"><span>Choose images</span><input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} /></label><div className="admin-upload__files">{files.length ? files.map((file) => <span key={file.name}>{file.name}</span>) : <span className="admin-upload__empty">No files selected</span>}</div><button className="admin-primary" disabled={!files.length || uploading} onClick={() => void upload()}>{uploading ? 'Uploading…' : `Upload ${files.length || ''} file${files.length === 1 ? '' : 's'}`}</button>{message ? <p className="admin-muted">{message}</p> : null}</div><div className="admin-media-grid">{media?.docs.map((doc) => <div className="admin-media-card" key={doc.id}><div className="admin-media-card__image">{doc.url ? <img src={String(doc.url)} alt={String(doc.alt || doc.filename || '')} /> : null}</div><strong>{String(doc.filename || doc.id)}</strong><small>{text(doc.filesize)}</small></div>)}</div></>
 }
 
