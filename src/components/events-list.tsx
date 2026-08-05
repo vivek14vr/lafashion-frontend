@@ -27,7 +27,7 @@ export function EventsList() {
     return () => window.clearTimeout(id)
   }, [searchInput])
 
-  const { data, isLoading, isError, isFetching } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['events', tab, page, PAGE_SIZE, search],
     queryFn: () =>
       tab === 'upcoming'
@@ -113,9 +113,10 @@ export function EventsList() {
       {isLoading && !data ? (
         <p className="py-16 text-[var(--muted)]">Loading events…</p>
       ) : isError ? (
-        <p className="py-16 text-[var(--muted)]">
-          Could not load events. Make sure the backend is running on port 3001.
-        </p>
+        <div className="mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] px-6 py-14 text-center">
+          <p className="text-[var(--muted)]">Events could not be loaded right now.</p>
+          <button type="button" onClick={() => void refetch()} className="mt-5 rounded-full border border-[var(--champagne)]/50 px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--champagne)] transition hover:bg-[var(--champagne)] hover:text-[#14120f]">Try again</button>
+        </div>
       ) : !data?.docs.length ? (
         <div className="mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] px-6 py-16 text-center">
           <p className="text-[var(--muted)]">

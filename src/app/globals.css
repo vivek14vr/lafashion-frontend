@@ -30,6 +30,7 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--champagne) 55%, transparent) var(--surface);
 }
@@ -39,6 +40,14 @@ body {
   color: var(--foreground);
   font-family: var(--font-body), system-ui, sans-serif;
   min-height: 100vh;
+  overflow-x: clip;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
 }
 
 *::-webkit-scrollbar {

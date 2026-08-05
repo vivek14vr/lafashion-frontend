@@ -31,9 +31,12 @@ export function SiteHeader() {
   }, [])
 
   useEffect(() => {
-    setOpen(false)
-    setRegisterOpen(false)
-    setMobileRegisterOpen(false)
+    const frame = window.requestAnimationFrame(() => {
+      setOpen(false)
+      setRegisterOpen(false)
+      setMobileRegisterOpen(false)
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [pathname])
 
   useEffect(() => {

@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element -- Admin previews use short-lived S3/Payload URLs and native lazy loading. */
+
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -135,10 +137,10 @@ function CollectionPage({ slug }: { slug: string }) {
   const [error, setError] = useState('')
   const readOnly = slug.includes('registration')
   const title = labels[slug] || slug
-  async function load() { const stopLoading = startLoading('Loading records…'); const search = query.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(query)}&where[or][1][email][contains]=${encodeURIComponent(query)}` : ''; try { setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }
-  useEffect(() => { void load() }, [slug])
+  const load = useCallback(async (searchTerm = '') => { const stopLoading = startLoading('Loading records…'); const search = searchTerm.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(searchTerm)}&where[or][1][email][contains]=${encodeURIComponent(searchTerm)}` : ''; try { setError(''); setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [router, slug, startLoading])
+  useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load()} /><button className="admin-secondary" onClick={() => void load()}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} /><button className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
 }
 
 function EventForm() {
@@ -152,12 +154,12 @@ function EventForm() {
   async function save(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading('Creating event…')
     try {
-      await api('/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      await api('/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, _status: 'published' }) })
       router.replace('/admin/events')
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not create event.') } finally { setSaving(false); stopLoading() }
   }
   const field = (name: keyof typeof data, label: string, type = 'text') => <label className="admin-form"><span>{label}</span><input required={['title', 'date', 'venue', 'excerpt'].includes(name)} type={type} value={data[name]} onChange={(event) => setData((current) => ({ ...current, [name]: event.target.value }))} /></label>
-  return <form className="admin-form admin-event-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Create event</h1><p className="admin-muted">Add a runway night or fashion event to the website.</p></div><button className="admin-primary" disabled={saving}>{saving ? 'Creating…' : 'Create event'}</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-event-details">{field('title', 'Event title')}{field('date', 'Date & time', 'datetime-local')}{field('venue', 'Venue')}{field('excerpt', 'Summary')}{field('ticketUrl', 'Ticket booking URL')}</div><div className="admin-event-images"><MediaChoice label="Portrait image" required value={data.portraitImage} media={media} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} /><MediaChoice label="Banner image" required value={data.bannerImage} media={media} onChange={(value) => setData((current) => ({ ...current, bannerImage: value }))} /></div><div className="admin-form-actions"><button className="admin-primary" disabled={saving}>{saving ? 'Creating…' : 'Create event'}</button></div></form>
+  return <form className="admin-form admin-event-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Create event</h1><p className="admin-muted">Add and publish a runway night or fashion event to the website.</p></div><button className="admin-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish event'}</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-event-details">{field('title', 'Event title')}{field('date', 'Date & time', 'datetime-local')}{field('venue', 'Venue')}{field('excerpt', 'Summary')}{field('ticketUrl', 'Ticket booking URL')}</div><div className="admin-event-images"><MediaChoice label="Portrait image" required value={data.portraitImage} media={media} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} /><MediaChoice label="Banner image" required value={data.bannerImage} media={media} onChange={(value) => setData((current) => ({ ...current, bannerImage: value }))} /></div><div className="admin-form-actions"><button className="admin-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish event'}</button></div></form>
 }
 
 function GalleryForm() {
@@ -173,7 +175,7 @@ function GalleryForm() {
   useEffect(() => { void Promise.all([api('/media?limit=200&sort=-createdAt'), api('/globals/media-folders').catch(() => ({ folders: [] })), api('/events?limit=200&sort=-date')]).then(([mediaData, folderData, eventData]) => { setMedia(mediaData.docs || []); setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean)); setEvents(eventData.docs || []) }).catch(() => undefined) }, [])
   async function save(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading('Creating gallery…')
-    try { await api('/galleries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, event: data.source === 'platform' ? data.event : null, published: false }) }); router.replace('/admin/galleries') } catch (err) { setError(err instanceof Error ? err.message : 'Could not create gallery.') } finally { setSaving(false); stopLoading() }
+    try { await api('/galleries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, event: data.source === 'platform' ? data.event : null, published: true }) }); router.replace('/admin/galleries') } catch (err) { setError(err instanceof Error ? err.message : 'Could not create gallery.') } finally { setSaving(false); stopLoading() }
   }
   function toggleImage(id: string) { setData((current) => ({ ...current, images: current.images.includes(id) ? current.images.filter((item) => item !== id) : [...current.images, id] })) }
   const visibleMedia = media.filter((image) => pickerFolder === '__unsorted__' ? !image.folder : image.folder === pickerFolder)
@@ -220,7 +222,7 @@ function HomeDestinationsPage() {
   const [galleryFolder, setGalleryFolder] = useState('')
   const [folders, setFolders] = useState<string[]>([])
 
-  async function load() {
+  const load = useCallback(async () => {
     const stopLoading = startLoading('Loading homepage settings…')
     try {
       const [data, mediaData] = await Promise.all([
@@ -236,9 +238,9 @@ function HomeDestinationsPage() {
     } finally {
       stopLoading()
     }
-  }
+  }, [startLoading])
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
 
   async function save() {
     setSaving(true)
@@ -330,8 +332,8 @@ function MediaPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [folders, setFolders] = useState<string[]>([])
   const [selectedFolder, setSelectedFolder] = useState('')
-  async function load() { const stopLoading = startLoading('Loading media library…'); try { const [mediaData, folderData] = await Promise.all([api('/media?limit=200&sort=-createdAt'), api('/globals/media-folders').catch(() => ({ folders: [] }))]); const docs = mediaData.docs || []; setAllMedia(docs); setMedia({ ...mediaData, docs: selectedFolder ? docs.filter((doc: Doc) => selectedFolder === '__unsorted__' ? !doc.folder : doc.folder === selectedFolder) : [] }); setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean)) } finally { stopLoading() } }
-  useEffect(() => { void load().catch(() => setMedia(null)) }, [selectedFolder])
+  const load = useCallback(async () => { const stopLoading = startLoading('Loading media library…'); try { const [mediaData, folderData] = await Promise.all([api('/media?limit=200&sort=-createdAt'), api('/globals/media-folders').catch(() => ({ folders: [] }))]); const docs = mediaData.docs || []; setAllMedia(docs); setMedia({ ...mediaData, docs: selectedFolder ? docs.filter((doc: Doc) => selectedFolder === '__unsorted__' ? !doc.folder : doc.folder === selectedFolder) : [] }); setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean)) } finally { stopLoading() } }, [selectedFolder, startLoading])
+  useEffect(() => { const timer = window.setTimeout(() => { void load().catch(() => setMedia(null)) }, 0); return () => window.clearTimeout(timer) }, [load])
   async function createFolder() { const name = window.prompt('New folder name'); const normalized = name?.trim(); if (!normalized || folders.includes(normalized)) return; const stopLoading = startLoading('Creating folder…'); try { await api('/globals/media-folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folders: [...folders.map((item) => ({ name: item })), { name: normalized }] }) }); setFolders((items) => [...items, normalized]); setSelectedFolder(normalized); setMessage(`Folder “${normalized}” created.`) } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not create folder.') } finally { stopLoading() } }
   async function renameFolder(oldName: string) { const name = window.prompt('Rename folder', oldName); const normalized = name?.trim(); if (!normalized || normalized === oldName || folders.includes(normalized)) return; const stopLoading = startLoading('Renaming folder…'); try { await api('/globals/media-folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folders: folders.map((item) => ({ name: item === oldName ? normalized : item })) }) }); const affected = allMedia.filter((doc) => doc.folder === oldName); await Promise.all(affected.map((doc) => api(`/media/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: normalized }) }))); setFolders((items) => items.map((item) => item === oldName ? normalized : item)); setAllMedia((items) => items.map((doc) => doc.folder === oldName ? { ...doc, folder: normalized } : doc)); if (selectedFolder === oldName) setSelectedFolder(normalized); setMessage(`Folder renamed to “${normalized}”.`) } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not rename folder.') } finally { stopLoading() } }
   async function upload() { if (!files.length) return; setUploading(true); setMessage(''); const stopLoading = startLoading('Uploading images…'); let completed = 0; const selectedFiles = [...files]; setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name }); try { for (const [fileIndex, file] of selectedFiles.entries()) { setUploadProgress({ current: fileIndex, total: selectedFiles.length, phase: 'Compressing', fileName: file.name }); const uploadedFile = await compressImage(file); setUploadProgress({ current: fileIndex + 1, total: selectedFiles.length, phase: 'Uploading', fileName: uploadedFile.name }); const body = new FormData(); body.append('file', uploadedFile); if (selectedFolder) body.append('_payload', JSON.stringify({ folder: selectedFolder })); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false); setUploadProgress(null); stopLoading() } }

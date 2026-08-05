@@ -1,10 +1,20 @@
 import type { EventItem, GalleryItem, Media, PayloadListResponse } from './types'
 
-// Same-origin by default (frontend proxies /api to Payload)
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+// Browser requests must stay on the current origin so they use the production
+// /api proxy. Server components can talk to Payload directly without making a
+// request back through the public frontend.
+const PUBLIC_API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')
+const SERVER_API_URL = (process.env.PAYLOAD_BACKEND_URL || 'http://127.0.0.1:3001').replace(
+  /\/$/,
+  '',
+)
+
+function getRequestApiUrl() {
+  return typeof window === 'undefined' ? SERVER_API_URL : PUBLIC_API_URL
+}
 
 export function getApiUrl() {
-  return API_URL
+  return PUBLIC_API_URL
 }
 
 export function getMediaUrl(media?: Media | string | null): string | null {
@@ -30,7 +40,7 @@ export function getMediaUrl(media?: Media | string | null): string | null {
       // adapter can issue a short-lived signed download URL.
       if (parsed.hostname.includes('amazonaws.com') && media.filename) {
         const prefix = media.prefix ? `?prefix=${encodeURIComponent(media.prefix)}` : ''
-        return `${API_URL}/api/media/file/${encodeURIComponent(media.filename)}${prefix}`
+        return `${PUBLIC_API_URL}/api/media/file/${encodeURIComponent(media.filename)}${prefix}`
       }
       if (parsed.pathname.startsWith('/api/media')) {
         return `${parsed.pathname}${parsed.search}`
@@ -45,7 +55,7 @@ export function getMediaUrl(media?: Media | string | null): string | null {
 }
 
 async function fetchPayload<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${getRequestApiUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -276,7 +286,7 @@ type RegistrationErrorBody = {
 } | null
 
 async function submitRegistrationCollection(path: string, data: unknown) {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${getRequestApiUrl()}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

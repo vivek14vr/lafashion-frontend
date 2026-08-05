@@ -54,12 +54,12 @@ function mediaToUrls(images?: (Media | string)[] | null): string[] {
 /** Load homepage destination cards from Payload (Admin → Home destination cards). */
 export async function getDestinationCarousels(): Promise<DestinationWithImages[]> {
   try {
-    // Prefer hitting the CMS directly on the server so localhost API URLs
-    // don't break production SSR when NEXT_PUBLIC_API_URL points at the site.
+    // Use Payload directly during SSR and the same-origin /api proxy in the
+    // browser. A localhost browser URL points at the visitor's own computer.
     const base =
-      typeof window === 'undefined' && process.env.PAYLOAD_BACKEND_URL
-        ? process.env.PAYLOAD_BACKEND_URL.replace(/\/$/, '')
-        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+      typeof window === 'undefined'
+        ? (process.env.PAYLOAD_BACKEND_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
+        : (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')
 
     // Hard timeout — Render static generation fails after 60s if the CMS is
     // asleep/unreachable and fetch hangs with no AbortSignal.
