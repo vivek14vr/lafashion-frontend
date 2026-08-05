@@ -111,6 +111,7 @@ function HomeDestinationsPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; phase: string; fileName: string } | null>(null)
 
   async function load() {
     try {
@@ -162,10 +163,14 @@ function HomeDestinationsPage() {
   async function uploadForDestination(destinationIndex: number, files: FileList | null) {
     if (!files?.length) return
     setError('')
+    const selectedFiles = Array.from(files)
+    setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name })
     try {
       const uploadedIds: string[] = []
-      for (const file of Array.from(files)) {
+      for (const [fileIndex, file] of selectedFiles.entries()) {
+        setUploadProgress({ current: fileIndex, total: selectedFiles.length, phase: 'Compressing', fileName: file.name })
         const uploadedFile = await compressImage(file)
+        setUploadProgress({ current: fileIndex + 1, total: selectedFiles.length, phase: 'Uploading', fileName: uploadedFile.name })
         const uploaded = await api('/media', { method: 'POST', body: (() => { const form = new FormData(); form.append('file', uploadedFile); return form })() })
         const doc = uploaded.doc || uploaded
         if (doc?.id) {
@@ -176,6 +181,8 @@ function HomeDestinationsPage() {
       if (uploadedIds.length) setDestinations((items) => items.map((item, index) => index === destinationIndex ? { ...item, images: [...(item.images || []), ...uploadedIds] } : item))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not upload images.')
+    } finally {
+      setUploadProgress(null)
     }
   }
 
@@ -186,9 +193,14 @@ function HomeDestinationsPage() {
     <div className="admin-destination-grid">{destinations.map((destination, index) => <div className="admin-welcome" key={destination.id || index}>
       <label className="admin-form"><span>City name</span><input value={destination.city || ''} onChange={(event) => setDestinations((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, city: event.target.value } : item))} /></label>
       <p className="admin-muted">{destination.images?.length || 0} rotating photo{destination.images?.length === 1 ? '' : 's'} attached.</p>
-      <div className="admin-destination-picker"><div className="admin-destination-picker__header"><strong>Select photos</strong><label className="admin-secondary admin-upload-button">Upload images<input type="file" accept="image/*" multiple onChange={(event) => { void uploadForDestination(index, event.target.files); event.currentTarget.value = '' }} /></label></div>{media.length ? <div className="admin-destination-picker__grid">{media.map((image) => { const selected = destination.images?.some((item) => (typeof item === 'string' ? item : item.id) === image.id) || false; return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(index, image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">Upload images to the Media library first, or use Upload images above.</p>}</div>
+      <div className="admin-destination-picker"><div className="admin-destination-picker__header"><strong>Select photos</strong><label className="admin-secondary admin-upload-button">Upload images<input type="file" accept="image/*" multiple disabled={Boolean(uploadProgress)} onChange={(event) => { void uploadForDestination(index, event.target.files); event.currentTarget.value = '' }} /></label></div>{uploadProgress ? <UploadProgress progress={uploadProgress} /> : null}{media.length ? <div className="admin-destination-picker__grid">{media.map((image) => { const selected = destination.images?.some((item) => (typeof item === 'string' ? item : item.id) === image.id) || false; return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(index, image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">Upload images to the Media library first, or use Upload images above.</p>}</div>
     </div>)}</div>
   </>
+}
+
+function UploadProgress({ progress }: { progress: { current: number; total: number; phase: string; fileName: string } }) {
+  const percentage = Math.round((progress.current / progress.total) * 100)
+  return <div className="admin-upload-progress" role="status"><div><strong>{progress.phase} {progress.current} of {progress.total}</strong><span>{percentage}%</span></div><div className="admin-upload-progress__track"><span style={{ width: `${Math.max(4, percentage)}%` }} /></div><small>{progress.fileName}</small></div>
 }
 
 function MediaPage() {
@@ -196,10 +208,11 @@ function MediaPage() {
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
   const [media, setMedia] = useState<ListResponse | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; phase: string; fileName: string } | null>(null)
   async function load() { setMedia(await api('/media?limit=60&sort=-createdAt').catch(() => null)) }
   useEffect(() => { void load() }, [])
-  async function upload() { if (!files.length) return; setUploading(true); setMessage('Optimizing images…'); let completed = 0; try { for (const file of files) { const uploadedFile = await compressImage(file); const body = new FormData(); body.append('file', uploadedFile); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false) } }
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">ASSETS</p><h1>Media library</h1><p className="admin-muted">Private S3-backed images shared by events, galleries, and homepage cards.</p></div></div><div className="admin-upload"><div><h2>Upload images</h2><p className="admin-muted">Choose one or more files, then confirm with the upload button.</p></div><label className="admin-file-picker"><span>Choose images</span><input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} /></label><div className="admin-upload__files">{files.length ? files.map((file) => <span key={file.name}>{file.name}</span>) : <span className="admin-upload__empty">No files selected</span>}</div><button className="admin-primary" disabled={!files.length || uploading} onClick={() => void upload()}>{uploading ? 'Uploading…' : `Upload ${files.length || ''} file${files.length === 1 ? '' : 's'}`}</button>{message ? <p className="admin-muted">{message}</p> : null}</div><div className="admin-media-grid">{media?.docs.map((doc) => <div className="admin-media-card" key={doc.id}><div className="admin-media-card__image">{doc.url ? <img src={String(doc.url)} alt={String(doc.alt || doc.filename || '')} /> : null}</div><strong>{String(doc.filename || doc.id)}</strong><small>{text(doc.filesize)}</small></div>)}</div></>
+  async function upload() { if (!files.length) return; setUploading(true); setMessage(''); let completed = 0; const selectedFiles = [...files]; setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name }); try { for (const [fileIndex, file] of selectedFiles.entries()) { setUploadProgress({ current: fileIndex, total: selectedFiles.length, phase: 'Compressing', fileName: file.name }); const uploadedFile = await compressImage(file); setUploadProgress({ current: fileIndex + 1, total: selectedFiles.length, phase: 'Uploading', fileName: uploadedFile.name }); const body = new FormData(); body.append('file', uploadedFile); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false); setUploadProgress(null) } }
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">ASSETS</p><h1>Media library</h1><p className="admin-muted">Private S3-backed images shared by events, galleries, and homepage cards.</p></div></div><div className="admin-upload"><div><h2>Upload images</h2><p className="admin-muted">Choose one or more files, then confirm with the upload button.</p></div><label className="admin-file-picker"><span>Choose images</span><input type="file" accept="image/*" multiple disabled={uploading} onChange={(e) => setFiles(Array.from(e.target.files || []))} /></label><div className="admin-upload__files">{files.length ? files.map((file) => <span key={file.name}>{file.name}</span>) : <span className="admin-upload__empty">No files selected</span>}</div>{uploadProgress ? <UploadProgress progress={uploadProgress} /> : null}<button className="admin-primary" disabled={!files.length || uploading} onClick={() => void upload()}>{uploading ? 'Uploading…' : `Upload ${files.length || ''} file${files.length === 1 ? '' : 's'}`}</button>{message ? <p className="admin-muted">{message}</p> : null}</div><div className="admin-media-grid">{media?.docs.map((doc) => <div className="admin-media-card" key={doc.id}><div className="admin-media-card__image">{doc.url ? <img src={String(doc.url)} alt={String(doc.alt || doc.filename || '')} /> : null}</div><strong>{String(doc.filename || doc.id)}</strong><small>{text(doc.filesize)}</small></div>)}</div></>
 }
 
 export function AdminApp({ section }: { section?: string[] }) {
