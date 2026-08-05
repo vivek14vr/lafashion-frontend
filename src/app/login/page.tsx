@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import { AdminLogin } from '@/components/admin/admin-login'
 
 export const metadata: Metadata = {
   title: 'Admin login',
@@ -11,6 +11,5 @@ export const metadata: Metadata = {
  * Fallback: same-origin /admin (proxied to Payload).
  */
 export default function LoginPage() {
-  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || '/admin'
-  redirect(adminUrl)
+  return <AdminLogin />
 }

@@ -35,14 +35,6 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: [
         {
-          source: '/admin',
-          destination: `${PAYLOAD_BACKEND_URL}/admin`,
-        },
-        {
-          source: '/admin/:path*',
-          destination: `${PAYLOAD_BACKEND_URL}/admin/:path*`,
-        },
-        {
           source: '/api/:path*',
           destination: `${PAYLOAD_BACKEND_URL}/api/:path*`,
         },
