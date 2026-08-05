@@ -7,6 +7,12 @@ const PAYLOAD_BACKEND_URL = (
 
 const nextConfig: NextConfig = {
   images: {
+    localPatterns: [
+      {
+        pathname: '/api/media/**',
+        search: '?prefix=lafashioncloset',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'http',
