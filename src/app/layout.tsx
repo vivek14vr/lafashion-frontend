@@ -23,6 +23,11 @@ export const metadata: Metadata = {
   },
   description:
     'Where fashion becomes an experience — global runway nights, designer wear, and Fashion Beyond Borders by LA Fashion Closet.',
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

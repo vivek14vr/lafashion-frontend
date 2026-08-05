@@ -68,13 +68,13 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="relative block h-9 w-[168px] sm:h-10 sm:w-[190px]">
           <Image
-            src="/logo.webp"
+            src="/logo.png"
             alt="LA Fashion Closet by Shagun"
             fill
             sizes="190px"
             priority
             unoptimized
-            className="object-contain object-left"
+            className="object-cover object-center"
           />
         </Link>
 

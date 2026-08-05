@@ -202,11 +202,6 @@ export default function AboutPage() {
               </a>
             </p>
             <p>
-              <a href="tel:+13102287705" className="transition hover:text-[var(--champagne)]">
-                +1 310 228 7705
-              </a>
-            </p>
-            <p>
               <a
                 href="https://www.instagram.com/lafashioncloset"
                 target="_blank"

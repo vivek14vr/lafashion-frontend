@@ -8,12 +8,12 @@ export function SiteFooter() {
         <div>
           <div className="relative h-10 w-[200px]">
             <Image
-              src="/logo.webp"
+              src="/logo.png"
               alt="LA Fashion Closet by Shagun"
               fill
               sizes="200px"
               unoptimized
-              className="object-contain object-left"
+              className="object-cover object-center"
             />
           </div>
           <p className="mt-5 max-w-md text-sm leading-relaxed text-[var(--muted)]">
@@ -28,9 +28,6 @@ export function SiteFooter() {
               className="transition hover:text-[var(--champagne)]"
             >
               www.lafashioncloset.com
-            </a>
-            <a href="tel:+13102287705" className="transition hover:text-[var(--champagne)]">
-              +1 310 228 7705
             </a>
             <a
               href="https://www.instagram.com/lafashioncloset"

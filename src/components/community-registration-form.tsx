@@ -197,7 +197,7 @@ export function CommunityRegistrationForm() {
           Thank you for registering
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-[var(--muted)]">
-          We received your community registration. Our team will review your details and be in touch
+          We received your registration. Our team will review your details and be in touch
           if there is a fit for an upcoming production.
         </p>
         <button

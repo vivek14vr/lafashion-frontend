@@ -116,12 +116,12 @@ function SiteLoaderOverlay({ onDone }: { onDone: () => void }) {
           transition={{ duration: 0.9, delay: 0.08, ease: easeOut }}
         >
           <Image
-            src="/banner_title.webp"
+            src="/logo.png"
             alt="LA Fashion Closet by Shagun"
             fill
             priority
             unoptimized
-            className="object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
+            className="object-cover object-center drop-shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
           />
         </motion.div>
 

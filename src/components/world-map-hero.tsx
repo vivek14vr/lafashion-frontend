@@ -717,19 +717,19 @@ export function WorldMapHero() {
         aria-hidden
       />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-[6%] z-20 flex justify-center px-4 sm:bottom-[12%] md:bottom-[16%]">
+      <div className="pointer-events-none absolute inset-x-0 bottom-[2%] z-20 flex justify-center px-4 sm:bottom-[6%] md:bottom-[7%]">
         <motion.div
           {...enter(0.85, 0.75)}
-          className="w-[min(42vw,156px)] sm:w-[min(46vw,220px)] md:w-[280px]"
+          className="w-[min(58vw,230px)] sm:w-[min(58vw,320px)] md:w-[420px]"
         >
           <Image
-            src="/banner_title.webp"
+            src="/logo.png"
             alt="LA Fashion Closet by Shagun"
             width={560}
             height={284}
             sizes="(max-width: 640px) 48vw, (max-width: 768px) 250px, 280px"
             unoptimized
-            className="h-auto w-full drop-shadow-[0_8px_28px_rgba(0,0,0,0.65),0_0_28px_rgba(212,165,116,0.22)]"
+            className="h-auto w-full object-cover object-center drop-shadow-[0_8px_28px_rgba(0,0,0,0.65),0_0_28px_rgba(212,165,116,0.22)]"
           />
         </motion.div>
       </div>
