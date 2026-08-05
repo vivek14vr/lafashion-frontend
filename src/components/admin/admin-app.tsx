@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { BarChart3, CalendarDays, ChevronRight, FolderOpen, Images, LayoutDashboard, LogOut, Menu, Users, X } from 'lucide-react'
 
 type Doc = Record<string, unknown> & { id: string; createdAt?: string; updatedAt?: string }
@@ -28,6 +28,38 @@ const labels: Record<string, string> = {
   'community-registrations': 'Community registrations',
   'designer-registrations': 'Designer registrations',
   'home-destinations': 'Homepage city snaps',
+}
+
+type AdminLoaderContextValue = {
+  startLoading: (message?: string) => () => void
+}
+
+const AdminLoaderContext = createContext<AdminLoaderContextValue>({
+  startLoading: () => () => undefined,
+})
+
+function useAdminLoader() {
+  return useContext(AdminLoaderContext)
+}
+
+function AdminLoadingProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState(0)
+  const [message, setMessage] = useState('Working…')
+  const startLoading = useCallback((nextMessage = 'Working…') => {
+    setMessage(nextMessage)
+    setPending((count) => count + 1)
+    let stopped = false
+    return () => {
+      if (stopped) return
+      stopped = true
+      setPending((count) => Math.max(0, count - 1))
+    }
+  }, [])
+
+  return <AdminLoaderContext.Provider value={{ startLoading }}>
+    {children}
+    {pending > 0 ? <div className="admin-action-loader" role="status" aria-live="polite" aria-busy="true"><span className="admin-action-loader__spinner" /><span>{message}</span></div> : null}
+  </AdminLoaderContext.Provider>
 }
 
 function text(value: unknown): string {
@@ -71,9 +103,15 @@ async function compressImage(file: File): Promise<File> {
 function Sidebar({ open, close }: { open: boolean; close: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { startLoading } = useAdminLoader()
   async function logout() {
-    await api('/users/logout', { method: 'POST' }).catch(() => undefined)
-    router.replace('/login')
+    const stopLoading = startLoading('Signing out…')
+    try {
+      await api('/users/logout', { method: 'POST' }).catch(() => undefined)
+      router.replace('/login')
+    } finally {
+      stopLoading()
+    }
   }
   return <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
     <div className="admin-sidebar__top"><Link href="/" className="admin-brand" onClick={close}><Image src="/logo.png" alt="LA Fashion Closet" width={190} height={56} unoptimized /></Link><button className="admin-icon-button admin-sidebar__close" onClick={close} aria-label="Close menu"><X size={20} /></button></div>
@@ -91,12 +129,13 @@ function Overview() {
 
 function CollectionPage({ slug }: { slug: string }) {
   const router = useRouter()
+  const { startLoading } = useAdminLoader()
   const [data, setData] = useState<ListResponse | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const readOnly = slug.includes('registration')
   const title = labels[slug] || slug
-  async function load() { const search = query.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(query)}&where[or][1][email][contains]=${encodeURIComponent(query)}` : ''; try { setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } }
+  async function load() { const stopLoading = startLoading('Loading records…'); const search = query.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(query)}&where[or][1][email][contains]=${encodeURIComponent(query)}` : ''; try { setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }
   useEffect(() => { void load() }, [slug])
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
   return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load()} /><button className="admin-secondary" onClick={() => void load()}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
@@ -104,17 +143,18 @@ function CollectionPage({ slug }: { slug: string }) {
 
 function EventForm() {
   const router = useRouter()
+  const { startLoading } = useAdminLoader()
   const [data, setData] = useState({ title: '', date: '', venue: '', excerpt: '', ticketUrl: '', portraitImage: '', bannerImage: '' })
   const [media, setMedia] = useState<Doc[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { void api('/media?limit=60&sort=-createdAt').then((response) => setMedia(response.docs || [])).catch(() => undefined) }, [])
   async function save(event: React.FormEvent) {
-    event.preventDefault(); setSaving(true); setError('')
+    event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading('Creating event…')
     try {
-      await api('/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, published: false }) })
+      await api('/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
       router.replace('/admin/events')
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create event.') } finally { setSaving(false) }
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create event.') } finally { setSaving(false); stopLoading() }
   }
   const field = (name: keyof typeof data, label: string, type = 'text') => <label className="admin-form"><span>{label}</span><input required={['title', 'date', 'venue', 'excerpt'].includes(name)} type={type} value={data[name]} onChange={(event) => setData((current) => ({ ...current, [name]: event.target.value }))} /></label>
   return <form className="admin-form admin-event-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Create event</h1><p className="admin-muted">Add a runway night or fashion event to the website.</p></div><button className="admin-primary" disabled={saving}>{saving ? 'Creating…' : 'Create event'}</button></div>{error ? <p className="admin-error">{error}</p> : null}{field('title', 'Event title')}{field('date', 'Date & time', 'datetime-local')}{field('venue', 'Venue')}{field('excerpt', 'Summary')}{field('ticketUrl', 'Ticket booking URL')}<div className="admin-event-images"><MediaChoice label="Portrait image" value={data.portraitImage} media={media} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} /><MediaChoice label="Banner image" value={data.bannerImage} media={media} onChange={(value) => setData((current) => ({ ...current, bannerImage: value }))} /></div></form>
@@ -128,6 +168,7 @@ type DestinationImage = string | { id: string; filename?: string; url?: string }
 type Destination = { id?: string; city: string; images?: DestinationImage[] }
 
 function HomeDestinationsPage() {
+  const { startLoading } = useAdminLoader()
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [media, setMedia] = useState<Doc[]>([])
   const [error, setError] = useState('')
@@ -137,6 +178,7 @@ function HomeDestinationsPage() {
   const [openGalleryFor, setOpenGalleryFor] = useState<number | null>(null)
 
   async function load() {
+    const stopLoading = startLoading('Loading homepage settings…')
     try {
       const [data, mediaData] = await Promise.all([
         api('/globals/home-destinations?depth=2'),
@@ -146,6 +188,8 @@ function HomeDestinationsPage() {
       setMedia(mediaData.docs || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load homepage destinations.')
+    } finally {
+      stopLoading()
     }
   }
 
@@ -155,6 +199,7 @@ function HomeDestinationsPage() {
     setSaving(true)
     setMessage('')
     setError('')
+    const stopLoading = startLoading('Saving homepage settings…')
     try {
       await api('/globals/home-destinations', {
         method: 'POST',
@@ -171,6 +216,7 @@ function HomeDestinationsPage() {
       setError(err instanceof Error ? err.message : 'Could not save homepage destinations.')
     } finally {
       setSaving(false)
+      stopLoading()
     }
   }
 
@@ -187,6 +233,7 @@ function HomeDestinationsPage() {
     if (!files?.length) return
     setError('')
     const selectedFiles = Array.from(files)
+    const stopLoading = startLoading('Uploading images…')
     setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name })
     try {
       const uploadedIds: string[] = []
@@ -206,6 +253,7 @@ function HomeDestinationsPage() {
       setError(err instanceof Error ? err.message : 'Could not upload images.')
     } finally {
       setUploadProgress(null)
+      stopLoading()
     }
   }
 
@@ -227,6 +275,7 @@ function UploadProgress({ progress }: { progress: { current: number; total: numb
 }
 
 function MediaPage() {
+  const { startLoading } = useAdminLoader()
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
@@ -236,15 +285,15 @@ function MediaPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [folders, setFolders] = useState<string[]>([])
   const [selectedFolder, setSelectedFolder] = useState('')
-  async function load() { const [mediaData, folderData] = await Promise.all([api('/media?limit=200&sort=-createdAt'), api('/globals/media-folders').catch(() => ({ folders: [] }))]); const docs = mediaData.docs || []; setAllMedia(docs); setMedia({ ...mediaData, docs: selectedFolder ? docs.filter((doc: Doc) => selectedFolder === '__unsorted__' ? !doc.folder : doc.folder === selectedFolder) : [] }); setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean)) }
+  async function load() { const stopLoading = startLoading('Loading media library…'); try { const [mediaData, folderData] = await Promise.all([api('/media?limit=200&sort=-createdAt'), api('/globals/media-folders').catch(() => ({ folders: [] }))]); const docs = mediaData.docs || []; setAllMedia(docs); setMedia({ ...mediaData, docs: selectedFolder ? docs.filter((doc: Doc) => selectedFolder === '__unsorted__' ? !doc.folder : doc.folder === selectedFolder) : [] }); setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean)) } finally { stopLoading() } }
   useEffect(() => { void load().catch(() => setMedia(null)) }, [selectedFolder])
-  async function createFolder() { const name = window.prompt('New folder name'); const normalized = name?.trim(); if (!normalized || folders.includes(normalized)) return; try { await api('/globals/media-folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folders: [...folders.map((item) => ({ name: item })), { name: normalized }] }) }); setFolders((items) => [...items, normalized]); setSelectedFolder(normalized); setMessage(`Folder “${normalized}” created.`) } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not create folder.') } }
-  async function upload() { if (!files.length) return; setUploading(true); setMessage(''); let completed = 0; const selectedFiles = [...files]; setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name }); try { for (const [fileIndex, file] of selectedFiles.entries()) { setUploadProgress({ current: fileIndex, total: selectedFiles.length, phase: 'Compressing', fileName: file.name }); const uploadedFile = await compressImage(file); setUploadProgress({ current: fileIndex + 1, total: selectedFiles.length, phase: 'Uploading', fileName: uploadedFile.name }); const body = new FormData(); body.append('file', uploadedFile); if (selectedFolder) body.append('_payload', JSON.stringify({ folder: selectedFolder })); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false); setUploadProgress(null) } }
-  async function removeMedia(doc: Doc) { if (!window.confirm(`Delete ${String(doc.filename || 'this image')} permanently?`)) return; setDeleting(doc.id); try { await api(`/media/${doc.id}`, { method: 'DELETE' }); setAllMedia((items) => items.filter((item) => item.id !== doc.id)); setMedia((current) => current ? { ...current, docs: current.docs.filter((item) => item.id !== doc.id), totalDocs: Math.max(0, current.totalDocs - 1) } : current); setMessage('Image deleted.') } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not delete image.') } finally { setDeleting(null) } }
+  async function createFolder() { const name = window.prompt('New folder name'); const normalized = name?.trim(); if (!normalized || folders.includes(normalized)) return; const stopLoading = startLoading('Creating folder…'); try { await api('/globals/media-folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folders: [...folders.map((item) => ({ name: item })), { name: normalized }] }) }); setFolders((items) => [...items, normalized]); setSelectedFolder(normalized); setMessage(`Folder “${normalized}” created.`) } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not create folder.') } finally { stopLoading() } }
+  async function upload() { if (!files.length) return; setUploading(true); setMessage(''); const stopLoading = startLoading('Uploading images…'); let completed = 0; const selectedFiles = [...files]; setUploadProgress({ current: 0, total: selectedFiles.length, phase: 'Preparing', fileName: selectedFiles[0].name }); try { for (const [fileIndex, file] of selectedFiles.entries()) { setUploadProgress({ current: fileIndex, total: selectedFiles.length, phase: 'Compressing', fileName: file.name }); const uploadedFile = await compressImage(file); setUploadProgress({ current: fileIndex + 1, total: selectedFiles.length, phase: 'Uploading', fileName: uploadedFile.name }); const body = new FormData(); body.append('file', uploadedFile); if (selectedFolder) body.append('_payload', JSON.stringify({ folder: selectedFolder })); await api('/media', { method: 'POST', body }); completed += 1; } setFiles([]); setMessage(`${completed} file${completed === 1 ? '' : 's'} uploaded successfully.`); await load() } catch (err) { setMessage(err instanceof Error ? err.message : 'Upload failed.') } finally { setUploading(false); setUploadProgress(null); stopLoading() } }
+  async function removeMedia(doc: Doc) { if (!window.confirm(`Delete ${String(doc.filename || 'this image')} permanently?`)) return; setDeleting(doc.id); const stopLoading = startLoading('Deleting image…'); try { await api(`/media/${doc.id}`, { method: 'DELETE' }); setAllMedia((items) => items.filter((item) => item.id !== doc.id)); setMedia((current) => current ? { ...current, docs: current.docs.filter((item) => item.id !== doc.id), totalDocs: Math.max(0, current.totalDocs - 1) } : current); setMessage('Image deleted.') } catch (err) { setMessage(err instanceof Error ? err.message : 'Could not delete image.') } finally { setDeleting(null); stopLoading() } }
   return <><div className="admin-page-heading"><div><p className="admin-eyebrow">ASSETS</p><h1>Media library</h1><p className="admin-muted">Private S3-backed images shared by events, galleries, and homepage cards.</p></div></div><div className="admin-media-folders"><strong>Folders</strong><button type="button" className="admin-secondary" onClick={() => void createFolder()}>Create folder</button></div><div className="admin-upload"><div><h2>Upload images</h2><p className="admin-muted">{selectedFolder ? `New uploads will be added to “${selectedFolder === '__unsorted__' ? 'Unsorted' : selectedFolder}”.` : 'Open a folder first, then upload images into it.'}</p></div><label className="admin-file-picker"><span>Choose images</span><input type="file" accept="image/*" multiple disabled={uploading || !selectedFolder} onChange={(e) => setFiles(Array.from(e.target.files || []))} /></label><div className="admin-upload__files">{files.length ? files.map((file) => <span key={file.name}>{file.name}<button type="button" aria-label={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((item) => item !== file))}>×</button></span>) : <span className="admin-upload__empty">{selectedFolder ? 'No files selected' : 'Select a folder to upload'}</span>}</div>{uploadProgress ? <UploadProgress progress={uploadProgress} /> : null}<button className="admin-primary" disabled={!files.length || uploading || !selectedFolder} onClick={() => void upload()}>{uploading ? 'Uploading…' : `Upload ${files.length || ''} file${files.length === 1 ? '' : 's'}`}</button>{message ? <p className="admin-muted">{message}</p> : null}</div>{!selectedFolder ? <div className="admin-folder-grid">{[{ id: '__unsorted__', name: 'Unsorted', count: allMedia.filter((doc) => !doc.folder).length }, ...folders.map((folder) => ({ id: folder, name: folder, count: allMedia.filter((doc) => doc.folder === folder).length }))].map((folder) => <button type="button" className="admin-folder-card" key={folder.id} onClick={() => setSelectedFolder(folder.id)}><FolderOpen size={28} /><strong>{folder.name}</strong><small>{folder.count} image{folder.count === 1 ? '' : 's'}</small></button>)}</div> : <><div className="admin-folder-heading"><button type="button" className="admin-secondary" onClick={() => setSelectedFolder('')}>← Back to folders</button><h2>{selectedFolder === '__unsorted__' ? 'Unsorted' : selectedFolder}</h2></div><div className="admin-media-grid">{media?.docs.map((doc) => <div className="admin-media-card" key={doc.id}><div className="admin-media-card__image">{doc.url ? <img loading="lazy" decoding="async" src={String(doc.url)} alt={String(doc.alt || doc.filename || '')} /> : null}</div><strong>{String(doc.filename || doc.id)}</strong><small>{text(doc.filesize)}</small><button type="button" className="admin-danger" disabled={deleting === doc.id} onClick={() => void removeMedia(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete image'}</button></div>)}</div></>}</>
 }
 
-export function AdminApp({ section }: { section?: string[] }) {
+function AdminAppContent({ section }: { section?: string[] }) {
   const [open, setOpen] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const slug = section?.[0]
@@ -284,4 +333,8 @@ export function AdminApp({ section }: { section?: string[] }) {
   // whole page here made every navigation look like a reload.
   const isNewEvent = slug === 'events' && section?.[1] === 'new'
   return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{isNewEvent ? <EventForm /> : !slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
+}
+
+export function AdminApp({ section }: { section?: string[] }) {
+  return <AdminLoadingProvider><AdminAppContent section={section} /></AdminLoadingProvider>
 }
