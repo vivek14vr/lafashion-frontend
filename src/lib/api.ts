@@ -14,13 +14,23 @@ export function getMediaUrl(media?: Media | string | null): string | null {
 
   const raw = media.url
 
-  // Absolute URLs: keep Cloudinary (and other CDN) as-is for next/image.
+  // Absolute URLs: keep legacy Cloudinary and other CDN URLs as-is.
   // Rewrite same-origin Payload file URLs to relative /api/media/... paths.
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     try {
       const parsed = new URL(raw)
       if (parsed.hostname.includes('cloudinary.com')) {
-        return raw
+        // Payload's S3 adapter can append its object prefix as a query
+        // parameter when reading legacy records. That parameter is not part
+        // of the Cloudinary asset URL and should not be sent to the CDN.
+        parsed.searchParams.delete('prefix')
+        return parsed.toString()
+      }
+      // Private S3 files must be fetched through Payload so its storage
+      // adapter can issue a short-lived signed download URL.
+      if (parsed.hostname.includes('amazonaws.com') && media.filename) {
+        const prefix = media.prefix ? `?prefix=${encodeURIComponent(media.prefix)}` : ''
+        return `${API_URL}/api/media/file/${encodeURIComponent(media.filename)}${prefix}`
       }
       if (parsed.pathname.startsWith('/api/media')) {
         return `${parsed.pathname}${parsed.search}`

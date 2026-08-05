@@ -3,6 +3,7 @@ export type Media = {
   alt?: string | null
   url?: string | null
   filename?: string | null
+  prefix?: string | null
   width?: number | null
   height?: number | null
 }
