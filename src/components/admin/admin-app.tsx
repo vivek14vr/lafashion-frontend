@@ -83,14 +83,19 @@ type Destination = { id?: string; city: string; images?: DestinationImage[] }
 
 function HomeDestinationsPage() {
   const [destinations, setDestinations] = useState<Destination[]>([])
+  const [media, setMedia] = useState<Doc[]>([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function load() {
     try {
-      const data = await api('/globals/home-destinations?depth=2')
+      const [data, mediaData] = await Promise.all([
+        api('/globals/home-destinations?depth=2'),
+        api('/media?limit=200&sort=-createdAt'),
+      ])
       setDestinations(data.destinations || [])
+      setMedia(mediaData.docs || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load homepage destinations.')
     }
@@ -106,13 +111,46 @@ function HomeDestinationsPage() {
       await api('/globals/home-destinations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destinations }),
+        body: JSON.stringify({
+          destinations: destinations.map((destination) => ({
+            ...destination,
+            images: destination.images?.map((image) => typeof image === 'string' ? image : image.id),
+          })),
+        }),
       })
       setMessage('Homepage destinations saved.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save homepage destinations.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function toggleImage(destinationIndex: number, imageId: string) {
+    setDestinations((items) => items.map((item, index) => {
+      if (index !== destinationIndex) return item
+      const images = item.images || []
+      const selected = images.some((image) => (typeof image === 'string' ? image : image.id) === imageId)
+      return { ...item, images: selected ? images.filter((image) => (typeof image === 'string' ? image : image.id) !== imageId) : [...images, imageId] }
+    }))
+  }
+
+  async function uploadForDestination(destinationIndex: number, files: FileList | null) {
+    if (!files?.length) return
+    setError('')
+    try {
+      const uploadedIds: string[] = []
+      for (const file of Array.from(files)) {
+        const uploaded = await api('/media', { method: 'POST', body: (() => { const form = new FormData(); form.append('file', file); return form })() })
+        const doc = uploaded.doc || uploaded
+        if (doc?.id) {
+          uploadedIds.push(doc.id)
+          setMedia((items) => [doc, ...items.filter((item) => item.id !== doc.id)])
+        }
+      }
+      if (uploadedIds.length) setDestinations((items) => items.map((item, index) => index === destinationIndex ? { ...item, images: [...(item.images || []), ...uploadedIds] } : item))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not upload images.')
     }
   }
 
@@ -123,7 +161,7 @@ function HomeDestinationsPage() {
     <div className="admin-destination-grid">{destinations.map((destination, index) => <div className="admin-welcome" key={destination.id || index}>
       <label className="admin-form"><span>City name</span><input value={destination.city || ''} onChange={(event) => setDestinations((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, city: event.target.value } : item))} /></label>
       <p className="admin-muted">{destination.images?.length || 0} rotating photo{destination.images?.length === 1 ? '' : 's'} attached.</p>
-      {destination.images?.length ? <div className="admin-upload__files">{destination.images.map((image, imageIndex) => <span key={typeof image === 'string' ? image : image.id}>{typeof image === 'string' ? image : image.filename || `Photo ${imageIndex + 1}`}</span>)}</div> : null}
+      <div className="admin-destination-picker"><div className="admin-destination-picker__header"><strong>Select photos</strong><label className="admin-secondary admin-upload-button">Upload images<input type="file" accept="image/*" multiple onChange={(event) => { void uploadForDestination(index, event.target.files); event.currentTarget.value = '' }} /></label></div>{media.length ? <div className="admin-destination-picker__grid">{media.map((image) => { const selected = destination.images?.some((item) => (typeof item === 'string' ? item : item.id) === image.id) || false; return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(index, image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">Upload images to the Media library first, or use Upload images above.</p>}</div>
     </div>)}</div>
   </>
 }
