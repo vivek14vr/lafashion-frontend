@@ -64,7 +64,7 @@ export async function getDestinationCarousels(): Promise<DestinationWithImages[]
     // Hard timeout — Render static generation fails after 60s if the CMS is
     // asleep/unreachable and fetch hangs with no AbortSignal.
     const response = await fetch(`${base}/api/globals/home-destinations?depth=2`, {
-      next: { revalidate: 30 },
+      cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
     })
 
