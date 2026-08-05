@@ -161,7 +161,8 @@ function EventForm() {
 }
 
 function MediaChoice({ label, value, media, onChange }: { label: string; value: string; media: Doc[]; onChange: (value: string) => void }) {
-  return <label className="admin-form"><span>{label}</span><select required value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose from media library</option>{media.map((image) => <option value={image.id} key={image.id}>{String(image.filename || image.id)}</option>)}</select></label>
+  const grouped = media.reduce<Record<string, Doc[]>>((result, image) => { const folder = String(image.folder || 'Unsorted'); (result[folder] ||= []).push(image); return result }, {})
+  return <label className="admin-form"><span>{label}</span><select required value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose from media library</option>{Object.entries(grouped).sort(([a], [b]) => a === 'Unsorted' ? -1 : b === 'Unsorted' ? 1 : a.localeCompare(b)).map(([folder, images]) => <optgroup label={folder} key={folder}>{images.map((image) => <option value={image.id} key={image.id}>{String(image.filename || image.id)}</option>)}</optgroup>)}</select></label>
 }
 
 type DestinationImage = string | { id: string; filename?: string; url?: string }
@@ -176,6 +177,8 @@ function HomeDestinationsPage() {
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; phase: string; fileName: string } | null>(null)
   const [openGalleryFor, setOpenGalleryFor] = useState<number | null>(null)
+  const [galleryFolder, setGalleryFolder] = useState('')
+  const [folders, setFolders] = useState<string[]>([])
 
   async function load() {
     const stopLoading = startLoading('Loading homepage settings…')
@@ -186,6 +189,8 @@ function HomeDestinationsPage() {
       ])
       setDestinations(data.destinations || [])
       setMedia(mediaData.docs || [])
+      const folderData = await api('/globals/media-folders').catch(() => ({ folders: [] }))
+      setFolders((folderData.folders || []).map((folder: { name: string }) => folder.name).filter(Boolean))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load homepage destinations.')
     } finally {
@@ -264,7 +269,7 @@ function HomeDestinationsPage() {
     <div className="admin-destination-grid">{destinations.map((destination, index) => <div className="admin-welcome" key={destination.id || index}>
       <label className="admin-form"><span>City name</span><input value={destination.city || ''} onChange={(event) => setDestinations((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, city: event.target.value } : item))} /></label>
       <p className="admin-muted">{destination.images?.length || 0} rotating photo{destination.images?.length === 1 ? '' : 's'} attached.</p>
-      <div className="admin-destination-picker"><div className="admin-destination-picker__header"><strong>Select photos</strong><div className="admin-destination-picker__actions"><label className="admin-secondary admin-upload-button">Upload new image<input type="file" accept="image/*" multiple disabled={Boolean(uploadProgress)} onChange={(event) => { void uploadForDestination(index, event.target.files); event.currentTarget.value = '' }} /></label><button type="button" className="admin-secondary" onClick={() => setOpenGalleryFor((current) => current === index ? null : index)}>{openGalleryFor === index ? 'Hide gallery' : 'Choose from gallery'}</button></div></div>{uploadProgress ? <UploadProgress progress={uploadProgress} /> : null}{openGalleryFor === index ? (media.length ? <div className="admin-destination-picker__grid">{media.map((image) => { const selected = destination.images?.some((item) => (typeof item === 'string' ? item : item.id) === image.id) || false; return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(index, image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">No images in the gallery yet. Upload a new image first.</p>) : null}</div>
+      <div className="admin-destination-picker"><div className="admin-destination-picker__header"><strong>Select photos</strong><div className="admin-destination-picker__actions"><label className="admin-secondary admin-upload-button">Upload new image<input type="file" accept="image/*" multiple disabled={Boolean(uploadProgress)} onChange={(event) => { void uploadForDestination(index, event.target.files); event.currentTarget.value = '' }} /></label><button type="button" className="admin-secondary" onClick={() => { setOpenGalleryFor((current) => current === index ? null : index); setGalleryFolder('') }}>{openGalleryFor === index ? 'Hide gallery' : 'Choose from gallery'}</button></div></div>{uploadProgress ? <UploadProgress progress={uploadProgress} /> : null}{openGalleryFor === index ? (galleryFolder === '' ? <div className="admin-picker-folders">{[{ name: 'Unsorted', id: '__unsorted__' }, ...folders.map((folder) => ({ name: folder, id: folder }))].map((folder) => <button type="button" className="admin-picker-folder" key={folder.id} onClick={() => setGalleryFolder(folder.id)}><FolderOpen size={20} /><strong>{folder.name}</strong><small>{media.filter((image) => folder.id === '__unsorted__' ? !image.folder : image.folder === folder.id).length} images</small></button>)}</div> : <><button type="button" className="admin-secondary admin-picker-back" onClick={() => setGalleryFolder('')}>← Back to folders</button>{media.filter((image) => galleryFolder === '__unsorted__' ? !image.folder : image.folder === galleryFolder).length ? <div className="admin-destination-picker__grid">{media.filter((image) => galleryFolder === '__unsorted__' ? !image.folder : image.folder === galleryFolder).map((image) => { const selected = destination.images?.some((item) => (typeof item === 'string' ? item : item.id) === image.id) || false; return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(index, image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">No images in this folder yet.</p>}</>) : null}</div>
     </div>)}</div>
   </>
 }
