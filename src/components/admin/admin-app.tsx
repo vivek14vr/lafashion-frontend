@@ -58,7 +58,7 @@ function AdminLoadingProvider({ children }: { children: ReactNode }) {
 
   return <AdminLoaderContext.Provider value={{ startLoading }}>
     {children}
-    {pending > 0 ? <div className="admin-action-loader" role="status" aria-live="polite" aria-busy="true"><span className="admin-action-loader__spinner" /><span>{message}</span></div> : null}
+    {pending > 0 ? <div className="admin-action-loader" role="status" aria-live="polite" aria-busy="true"><div className="admin-action-loader__panel"><span className="admin-action-loader__spinner" /><span>{message}</span></div></div> : null}
   </AdminLoaderContext.Provider>
 }
 
