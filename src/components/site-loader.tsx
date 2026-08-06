@@ -151,14 +151,19 @@ function SiteLoaderOverlay({ onDone }: { onDone: () => void }) {
 }
 
 export function SiteLoader({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false)
-  // Always show on full page load / reload. Layout stays mounted for client navigations,
-  // so in-app route changes will not replay the intro.
-  const [showLoader, setShowLoader] = useState(true)
+  // Keep the page usable even if a client bundle fails to hydrate. The loader is
+  // added after hydration, so a server-rendered page can never be covered by a
+  // permanent full-screen overlay.
+  const [ready] = useState(true)
+  const [showLoader, setShowLoader] = useState(false)
 
   useEffect(() => {
+    // Show the intro only on full page loads. Layout stays mounted for client
+    // navigations, so in-app route changes will not replay it.
+    const frame = requestAnimationFrame(() => setShowLoader(true))
     document.documentElement.classList.add('lafashion-loading')
     return () => {
+      cancelAnimationFrame(frame)
       document.documentElement.classList.remove('lafashion-loading')
     }
   }, [])
@@ -166,7 +171,6 @@ export function SiteLoader({ children }: { children: ReactNode }) {
   const onDone = useCallback(() => {
     document.documentElement.classList.remove('lafashion-loading')
     setShowLoader(false)
-    setReady(true)
   }, [])
 
   const value = useMemo(() => ({ ready }), [ready])

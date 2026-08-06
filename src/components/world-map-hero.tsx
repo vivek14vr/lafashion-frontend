@@ -182,7 +182,7 @@ export function WorldMapHero() {
     reduceMotion
       ? { initial: false as const, animate: { opacity: 1 } }
       : {
-          initial: { opacity: 0, y: 18 },
+          initial: false,
           animate: ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 },
           transition: { duration, delay, ease: easeOut },
         }
@@ -191,7 +191,7 @@ export function WorldMapHero() {
     reduceMotion
       ? { initial: false as const, animate: { opacity: 1 } }
       : {
-          initial: { opacity: 0, scale: 1.06 },
+          initial: false,
           animate: ready ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 1.06 },
           transition: { duration, delay, ease: easeOut },
         }
@@ -200,7 +200,7 @@ export function WorldMapHero() {
     reduceMotion
       ? { initial: false as const, animate: { opacity: 1 } }
       : {
-          initial: { opacity: 0, y: 36 },
+          initial: false,
           animate: ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 36 },
           transition: { duration, delay, ease: easeOut },
         }
@@ -461,7 +461,7 @@ export function WorldMapHero() {
         {...(reduceMotion
           ? { initial: false, animate: { opacity: 1 } }
           : {
-              initial: { opacity: 0 },
+              initial: false,
               animate: { opacity: ready ? 1 : 0 },
               transition: { duration: 1.1, ease: easeOut },
             })}
@@ -512,7 +512,7 @@ export function WorldMapHero() {
             {...(reduceMotion
               ? { initial: false, animate: { opacity: 1 } }
               : {
-                  initial: { opacity: 0 },
+                  initial: false,
                   animate: { opacity: ready ? 1 : 0 },
                   transition: { duration: 0.9, delay: 0.35, ease: easeOut },
                 })}
@@ -644,7 +644,7 @@ export function WorldMapHero() {
         {...(reduceMotion
           ? { initial: false, animate: { opacity: 1 } }
           : {
-              initial: { opacity: 0 },
+              initial: false,
               animate: { opacity: ready ? 1 : 0 },
               transition: { duration: 1, delay: 0.55, ease: easeOut },
             })}

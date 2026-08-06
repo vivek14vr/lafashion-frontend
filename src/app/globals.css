@@ -157,7 +157,7 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-title-marquee {
-    animation: none;
+    animation-duration: 60s;
   }
 }
 
