@@ -13,14 +13,6 @@ type Props = {
 export function DestinationsCarouselSection({ destinations }: Props) {
   if (!destinations.length) return null
 
-  const arcPositions = [
-    'destination-arc-card--outer-left',
-    'destination-arc-card--left',
-    'destination-arc-card--center',
-    'destination-arc-card--right',
-    'destination-arc-card--outer-right',
-  ]
-
   return (
     <section className="bg-[var(--background)] pt-12 pb-14 sm:pt-16 sm:pb-20 md:pt-20 md:pb-24">
       <div className="mx-auto mb-8 max-w-[1600px] px-4 md:mb-12 md:px-6 lg:px-8">
@@ -52,7 +44,7 @@ export function DestinationsCarouselSection({ destinations }: Props) {
         </motion.div>
       </div>
 
-      <div className="destination-arc-grid mx-auto grid max-w-[1600px] px-3 sm:px-4 lg:px-5">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-2.5 px-3 sm:grid-cols-3 sm:gap-3 sm:px-4 md:grid-cols-3 md:gap-4 lg:grid-cols-5 lg:gap-5 lg:px-5">
         {destinations.map((destination, index) => (
           <motion.div
             key={destination.id}
@@ -60,11 +52,9 @@ export function DestinationsCarouselSection({ destinations }: Props) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.55, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
-            className="destination-arc-item min-w-0"
+            className="min-w-0"
           >
-            <div className={`destination-arc-card ${arcPositions[index] ?? ''}`}>
-              <DestinationCardCarousel destination={destination} staggerMs={index * 400} />
-            </div>
+            <DestinationCardCarousel destination={destination} staggerMs={index * 400} />
           </motion.div>
         ))}
       </div>
