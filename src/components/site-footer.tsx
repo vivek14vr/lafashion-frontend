@@ -57,6 +57,26 @@ export function SiteFooter() {
           </p>
         </div>
       </div>
+
+      <div className="border-t border-[var(--border-subtle)] px-6 py-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-3 text-center sm:flex-row sm:gap-4">
+          <p className="text-xs tracking-[0.08em] text-[var(--muted)]">Designed and developed by</p>
+          <a
+            href="https://roamingevents.com"
+            aria-label="Visit Roaming Events"
+            className="relative block aspect-[3.67] w-[112px] overflow-hidden bg-white transition-opacity hover:opacity-80"
+          >
+            <Image
+              src="/roaming-events.webp"
+              alt="Roaming Events"
+              fill
+              sizes="112px"
+              unoptimized
+              className="object-contain"
+            />
+          </a>
+        </div>
+      </div>
     </footer>
   )
 }
