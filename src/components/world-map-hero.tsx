@@ -648,14 +648,14 @@ export function WorldMapHero() {
               animate: { opacity: ready ? 1 : 0 },
               transition: { duration: 1, delay: 0.55, ease: easeOut },
             })}
-        className="pointer-events-none absolute inset-x-0 bottom-[18%] z-[15] overflow-hidden sm:bottom-[14%] md:bottom-[9%] md:z-[6]"
+        className="hero-title-marquee-wrap pointer-events-none absolute inset-x-0 z-[15] overflow-hidden md:z-[6]"
       >
         <h1 className="sr-only">Fashion Beyond Borders</h1>
         <div className="hero-title-marquee" aria-hidden>
           {[0, 1].map((copy) => (
             <p
               key={copy}
-              className="flex shrink-0 items-center px-3 font-[family-name:var(--font-display)] text-[clamp(2.35rem,12vw,11rem)] leading-none tracking-[0.06em] opacity-90 sm:px-4 sm:text-[clamp(3.6rem,14vw,11rem)] sm:opacity-100"
+              className="flex shrink-0 items-center px-3 font-[family-name:var(--font-display)] text-[clamp(1.9rem,9.5vw,3.25rem)] leading-none tracking-[0.06em] opacity-90 sm:px-4 sm:text-[clamp(3.6rem,14vw,11rem)] sm:opacity-100"
               style={{
                 backgroundImage:
                   'linear-gradient(180deg, #fff6e4 0%, #f0d7b4 28%, #d4a574 62%, #b88855 100%)',
@@ -720,7 +720,7 @@ export function WorldMapHero() {
       <div className="pointer-events-none absolute inset-x-0 bottom-[2%] z-20 flex justify-center px-4 sm:bottom-[6%] md:bottom-[7%]">
         <motion.div
           {...enter(0.85, 0.75)}
-          className="w-[min(58vw,230px)] sm:w-[min(58vw,320px)] md:w-[420px]"
+          className="w-[min(46vw,190px)] sm:w-[min(58vw,320px)] md:w-[420px]"
         >
           <Image
             src="/logo.png"

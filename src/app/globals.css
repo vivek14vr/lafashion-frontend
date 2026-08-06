@@ -129,9 +129,29 @@ svg {
   animation: hero-title-marquee 32s linear infinite;
 }
 
+.hero-title-marquee-wrap {
+  bottom: 9%;
+}
+
 @media (max-width: 639px) {
+  .hero-title-marquee-wrap {
+    bottom: 28%;
+  }
+
   .hero-title-marquee {
     animation-duration: 22s;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .hero-title-marquee-wrap {
+    bottom: 14%;
+  }
+}
+
+@media (max-width: 430px) {
+  .hero-title-marquee-wrap {
+    bottom: 29%;
   }
 }
 
