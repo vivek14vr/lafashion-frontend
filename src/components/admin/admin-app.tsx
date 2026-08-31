@@ -455,13 +455,14 @@ function MediaPage() {
 function AdminAppContent({ section }: { section?: string[] }) {
   const [open, setOpen] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
+  const [sessionError, setSessionError] = useState(false)
   const slug = section?.[0]
 
   useEffect(() => {
     let active = true
-    // Verify the existing session first. Refresh only when Payload explicitly
-    // says the session is unauthorized; network/5xx failures must not log the
-    // user out because those are temporary backend failures.
+    // Verify the existing session before rendering any admin UI. A failed
+    // session check must fail closed; otherwise public collections could make
+    // an unauthenticated visitor look like they are inside the admin panel.
     api('/users/me')
       .catch(async (error) => {
         if (!(error instanceof Error) || error.message !== 'AUTH_REQUIRED') throw error
@@ -477,10 +478,7 @@ function AdminAppContent({ section }: { section?: string[] }) {
           window.location.replace('/login')
           return
         }
-        // Keep the shell mounted during a transient API/database outage. The
-        // individual page will show its own request error and can recover on
-        // the next navigation or refresh.
-        setSessionReady(true)
+        setSessionError(true)
       })
     return () => {
       active = false
@@ -501,6 +499,9 @@ function AdminAppContent({ section }: { section?: string[] }) {
 
     return () => window.clearInterval(timer)
   }, [sessionReady])
+
+  if (sessionError) return <div className="admin-session-loading"><div><p>We couldn’t verify your admin session.</p><button className="admin-secondary" type="button" onClick={() => window.location.reload()}>Try again</button></div></div>
+  if (!sessionReady) return <div className="admin-session-loading">Checking admin access…</div>
 
   // Keep the admin shell mounted while the session is refreshed in the
   // background. Route transitions remount this component, and blocking the
