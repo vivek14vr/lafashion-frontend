@@ -149,12 +149,28 @@ function CollectionPage({ slug }: { slug: string }) {
   const [data, setData] = useState<ListResponse | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
   const readOnly = slug.includes('registration')
   const title = labels[slug] || slug
   const load = useCallback(async (searchTerm = '') => { const stopLoading = startLoading('Loading records…'); const search = searchTerm.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(searchTerm)}&where[or][1][email][contains]=${encodeURIComponent(searchTerm)}` : ''; try { setError(''); setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [router, slug, startLoading])
   useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
+  async function removeEvent(doc: Doc) {
+    if (slug !== 'events' || !window.confirm(`Delete “${String(doc.title || 'this event')}” permanently?`)) return
+    setDeleting(doc.id)
+    const stopLoading = startLoading('Deleting event…')
+    try {
+      await api(`/events/${doc.id}`, { method: 'DELETE' })
+      setData((current) => current ? { ...current, docs: current.docs.filter((item) => item.id !== doc.id), totalDocs: Math.max(0, current.totalDocs - 1) } : current)
+    } catch (err) {
+      if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login')
+      else setError(err instanceof Error ? err.message : 'Could not delete event.')
+    } finally {
+      setDeleting(null)
+      stopLoading()
+    }
+  }
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} /><button className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} /><button className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replace(/([A-Z])/g, ' $1')}</th>)}<th>Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open</Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found.</div> : null}</div></>
 }
 
 function RecordDetailPage({ slug, id }: { slug: string; id: string }) {
