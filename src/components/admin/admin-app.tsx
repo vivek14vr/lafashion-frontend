@@ -83,6 +83,16 @@ function text(value: unknown): string {
   return String(value)
 }
 
+function repairMojibake(value: string): string {
+  if (!/[ÃÂâð�]/.test(value)) return value
+  try {
+    const bytes = Uint8Array.from(Array.from(value), (character) => character.charCodeAt(0) & 0xff)
+    return new TextDecoder('utf-8').decode(bytes)
+  } catch {
+    return value
+  }
+}
+
 function relationId(value: unknown): string {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && 'id' in value) return String((value as { id: unknown }).id)
@@ -232,7 +242,7 @@ function CollectionPage({ slug }: { slug: string }) {
       if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10)
     }
     if (typeof value === 'object') return JSON.stringify(value)
-    return String(value)
+    return repairMojibake(String(value))
   }
   async function downloadCsv() {
     setExporting(true)
