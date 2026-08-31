@@ -151,19 +151,15 @@ function SiteLoaderOverlay({ onDone }: { onDone: () => void }) {
 }
 
 export function SiteLoader({ children }: { children: ReactNode }) {
-  // Keep the page usable even if a client bundle fails to hydrate. The loader is
-  // added after hydration, so a server-rendered page can never be covered by a
-  // permanent full-screen overlay.
+  // Render the overlay in the initial server/client tree so page content cannot
+  // flash before the intro appears. The layout stays mounted for client
+  // navigations, so it only runs once per full page load.
   const [ready] = useState(true)
-  const [showLoader, setShowLoader] = useState(false)
+  const [showLoader, setShowLoader] = useState(true)
 
   useEffect(() => {
-    // Show the intro only on full page loads. Layout stays mounted for client
-    // navigations, so in-app route changes will not replay it.
-    const frame = requestAnimationFrame(() => setShowLoader(true))
     document.documentElement.classList.add('lafashion-loading')
     return () => {
-      cancelAnimationFrame(frame)
       document.documentElement.classList.remove('lafashion-loading')
     }
   }, [])

@@ -279,3 +279,42 @@ html.lafashion-loading body {
 .admin-media-choice__required { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 @media (max-width:760px) { .admin-event-details, .admin-event-images { grid-template-columns:1fr; }.admin-event-details .admin-form:first-child, .admin-event-details .admin-form:nth-child(4), .admin-event-details .admin-form:nth-child(5) { grid-column:auto; }.admin-media-modal { padding:0; }.admin-media-modal__panel { width:100%; height:100dvh; max-height:none; border-radius:0; border-inline:0; }.admin-media-modal__header { padding:20px 18px 16px; }.admin-media-modal__body { padding:18px; }.admin-media-modal .admin-picker-folders { grid-template-columns:repeat(2,minmax(0,1fr)); }.admin-media-modal .admin-destination-picker__grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:620px) { .admin-media-choice__control, .admin-media-choice__control.has-selection { grid-template-columns:60px minmax(0,1fr); }.admin-media-choice__selected-image { width:60px; height:50px; }.admin-media-choice__control-actions { grid-column:1/-1; }.admin-media-choice__control-actions .admin-secondary { flex:1; } }
+
+/* Admin readability pass: preserve the editorial look while improving scanning and focus. */
+.admin-shell { background:#11100f; }
+.admin-sidebar { background:#171411; }
+.admin-sidebar nav a, .admin-logout { color:rgba(244,240,232,.8); font-size:14px; }
+.admin-topbar { color:rgba(244,240,232,.78); font-size:14px; }
+.admin-content { width:100%; }
+.admin-page-heading h1 { font-size:clamp(38px,4.4vw,62px); line-height:1; letter-spacing:-.015em; }
+.admin-muted { color:rgba(244,240,232,.72); font-size:15px; }
+.admin-eyebrow { font-size:12px; }
+.admin-primary, .admin-secondary { min-height:46px; font-size:14px; }
+.admin-toolbar { align-items:stretch; margin-bottom:12px; }
+.admin-toolbar input { min-height:48px; padding-inline:16px; font-size:15px; }
+.admin-toolbar .admin-secondary { min-width:96px; }
+.admin-table-meta { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 2px 12px; color:rgba(244,240,232,.64); font-size:13px; }
+.admin-table-meta strong { color:var(--cream); font-size:14px; }
+.admin-table-wrap { border-color:rgba(212,165,116,.3); box-shadow:0 12px 34px rgba(0,0,0,.12); }
+.admin-table-wrap table { min-width:780px; }
+.admin-table-wrap th, .admin-table-wrap td { padding:17px 18px; font-size:14px; vertical-align:middle; }
+.admin-table-wrap th { background:#1c1916; color:#f0c68d; font-size:11px; font-weight:800; }
+.admin-table-wrap td { color:rgba(244,240,232,.84); line-height:1.45; }
+.admin-table-wrap tbody tr:nth-child(even) { background:rgba(255,255,255,.018); }
+.admin-table-wrap tbody tr:hover { background:rgba(212,165,116,.08); }
+.admin-table-wrap tbody tr:last-child td { border-bottom:0; }
+.admin-table-actions { gap:16px; }
+.admin-table-link, .admin-table-delete { display:inline-flex; align-items:center; min-height:36px; padding:0 10px; border-radius:7px; font-size:14px; }
+.admin-table-link { border:1px solid rgba(212,165,116,.38); background:rgba(212,165,116,.08); }
+.admin-table-link:hover { background:rgba(212,165,116,.18); text-decoration:none; }
+.admin-table-delete { border:1px solid rgba(255,130,115,.28); background:rgba(255,100,90,.06); }
+.admin-table-delete:hover { text-decoration:none; background:rgba(255,100,90,.14); }
+.admin-empty { padding:38px 24px; color:rgba(244,240,232,.72); font-size:15px; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media (max-width:620px) {
+  .admin-page-heading h1 { font-size:42px; }
+  .admin-table-meta { align-items:flex-start; flex-direction:column; gap:4px; }
+  .admin-table-wrap { border-radius:10px; }
+  .admin-table-wrap th, .admin-table-wrap td { padding:15px 14px; }
+  .admin-table-wrap::after { content:'Swipe horizontally to see all columns'; display:block; padding:10px 14px; border-top:1px solid rgba(255,255,255,.07); color:rgba(244,240,232,.55); font-size:12px; }
+}
