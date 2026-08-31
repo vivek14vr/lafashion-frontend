@@ -221,8 +221,12 @@ function CollectionPage({ slug }: { slug: string }) {
       stopLoading()
     }
   }
-  function csvValue(value: unknown): string {
+  function csvValue(field: string, value: unknown): string {
     if (value == null) return ''
+    if (/date|At$/i.test(field)) {
+      const date = new Date(String(value))
+      if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10)
+    }
     if (typeof value === 'object') return JSON.stringify(value)
     return String(value)
   }
@@ -243,9 +247,9 @@ function CollectionPage({ slug }: { slug: string }) {
         setError('There are no records matching the selected filters.')
         return
       }
-      const fields = Array.from(new Set(records.flatMap((record) => Object.keys(record))))
-      const escape = (value: unknown) => `"${csvValue(value).replaceAll('"', '""')}"`
-      const csv = [fields.map(escape).join(','), ...records.map((record) => fields.map((field) => escape(record[field])).join(','))].join('\r\n')
+      const fields = Array.from(new Set(records.flatMap((record) => Object.keys(record)))).filter((field) => !['id', 'signature'].includes(field.toLowerCase()))
+      const escape = (field: string, value: unknown) => `"${csvValue(field, value).replaceAll('"', '""')}"`
+      const csv = [fields.map((field) => escape(field, field)).join(','), ...records.map((record) => fields.map((field) => escape(field, record[field])).join(','))].join('\r\n')
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
