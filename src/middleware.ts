@@ -17,9 +17,9 @@ export async function middleware(request: NextRequest) {
         headers: {
           ...(cookie ? { cookie } : {}),
           // Payload validates cookie-authenticated requests against its CSRF
-          // allowlist. This request is server-to-server, so provide the
-          // browser origin explicitly instead of relying on Sec-Fetch-Site.
-          origin: request.nextUrl.origin,
+          // checks. This request is server-to-server and has no browser
+          // Origin header, so identify it as same-site explicitly.
+          'sec-fetch-site': 'same-site',
         },
         cache: 'no-store',
         signal: controller.signal,
