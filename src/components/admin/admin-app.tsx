@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BarChart3, CalendarDays, ChevronRight, FolderOpen, Images, LayoutDashboard, LogOut, Menu, Pencil, Users, X } from 'lucide-react'
+import { BarChart3, CalendarDays, ChevronRight, Download, FolderOpen, Images, LayoutDashboard, LogOut, Menu, Pencil, Users, X } from 'lucide-react'
 
 type Doc = Record<string, unknown> & { id: string; createdAt?: string; updatedAt?: string }
 type ListResponse = { docs: Doc[]; totalDocs: number; totalPages: number; page: number }
@@ -162,13 +162,34 @@ function CollectionPage({ slug }: { slug: string }) {
   const [data, setData] = useState<ListResponse | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const readOnly = slug.includes('registration')
   const isSubmission = readOnly
   const title = labels[slug] || slug
-  const load = useCallback(async (searchTerm = '', nextStatus = statusFilter) => { const stopLoading = startLoading('Loading records…'); const search = searchTerm.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(searchTerm)}&where[or][1][email][contains]=${encodeURIComponent(searchTerm)}` : ''; const status = isSubmission && nextStatus ? `&where[status][equals]=${encodeURIComponent(nextStatus)}` : ''; try { setError(''); setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}${status}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [isSubmission, router, slug, startLoading, statusFilter])
+  const buildQuery = useCallback((searchTerm = '', nextStatus = '', from = '', to = '', page = 1, limit = 50) => {
+    const params = new URLSearchParams({ depth: '1', limit: String(limit), page: String(page), sort: '-createdAt' })
+    const term = searchTerm.trim()
+    if (term) {
+      params.set('where[or][0][title][contains]', term)
+      params.set('where[or][1][email][contains]', term)
+    }
+    if (isSubmission && nextStatus) params.set('where[status][equals]', nextStatus)
+    if (isSubmission && from) {
+      const start = new Date(`${from}T00:00:00`)
+      if (!Number.isNaN(start.getTime())) params.set('where[createdAt][greater_than_equal]', start.toISOString())
+    }
+    if (isSubmission && to) {
+      const end = new Date(`${to}T00:00:00`)
+      if (!Number.isNaN(end.getTime())) params.set('where[createdAt][less_than]', new Date(end.getTime() + 86_400_000).toISOString())
+    }
+    return params.toString()
+  }, [isSubmission])
+  const load = useCallback(async (searchTerm = '', nextStatus = '', from = '', to = '') => { const stopLoading = startLoading('Loading records…'); try { setError(''); setData(await api(`/${slug}?${buildQuery(searchTerm, nextStatus, from, to)}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [buildQuery, router, slug, startLoading])
   useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
   async function removeEvent(doc: Doc) {
     if (slug !== 'events' || !window.confirm(`Delete “${String(doc.title || 'this event')}” permanently?`)) return
@@ -200,11 +221,53 @@ function CollectionPage({ slug }: { slug: string }) {
       stopLoading()
     }
   }
+  function csvValue(value: unknown): string {
+    if (value == null) return ''
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
+  async function downloadCsv() {
+    setExporting(true)
+    const stopLoading = startLoading('Preparing CSV…')
+    try {
+      const records: Doc[] = []
+      let page = 1
+      let totalPages = 1
+      do {
+        const response = await api(`/${slug}?${buildQuery(query, statusFilter, dateFrom, dateTo, page, 100)}`) as ListResponse
+        records.push(...(response.docs || []))
+        totalPages = response.totalPages || 1
+        page += 1
+      } while (page <= totalPages)
+      if (!records.length) {
+        setError('There are no records matching the selected filters.')
+        return
+      }
+      const fields = Array.from(new Set(records.flatMap((record) => Object.keys(record))))
+      const escape = (value: unknown) => `"${csvValue(value).replaceAll('"', '""')}"`
+      const csv = [fields.map(escape).join(','), ...records.map((record) => fields.map((field) => escape(record[field])).join(','))].join('\r\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${slug}-${dateFrom || 'all'}${dateTo ? `-to-${dateTo}` : ''}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login')
+      else setError(err instanceof Error ? err.message : 'Could not download CSV.')
+    } finally {
+      setExporting(false)
+      stopLoading()
+    }
+  }
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
   const fieldLabel = (column: string) => column.replace(/([A-Z])/g, ' $1').replace(/^./, (character) => character.toUpperCase())
   const recordLabel = data ? `${data.totalDocs} ${data.totalDocs === 1 ? 'record' : 'records'}` : 'Loading records…'
   const statuses = [{ label: 'New submission', value: 'new' }, { label: 'Contacted', value: 'contacted' }, { label: 'Shortlisted', value: 'shortlisted' }, { label: 'Approved', value: 'approved' }, { label: 'Rejected', value: 'rejected' }, { label: 'Archived', value: 'archived' }]
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review submissions and move each applicant through your workflow.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder="Search by title or email" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} />{isSubmission ? <><label className="sr-only" htmlFor="admin-status-filter">Filter by submission status</label><select id="admin-status-filter" className="admin-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></> : null}<button type="button" className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{column === 'status' && isSubmission ? <select className="admin-status-select" aria-label={`Update status for ${text(doc.title || doc.email || doc.id)}`} value={String(doc.status || 'new')} disabled={updatingStatus === doc.id} onChange={(event) => void updateSubmissionStatus(doc, event.target.value)}>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select> : text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review submissions and move each applicant through your workflow.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder="Search by title or email" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query, statusFilter, dateFrom, dateTo)} />{isSubmission ? <><label className="sr-only" htmlFor="admin-status-filter">Filter by submission status</label><select id="admin-status-filter" className="admin-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><label className="admin-date-filter">From<input aria-label="Submitted from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label><label className="admin-date-filter">To<input aria-label="Submitted to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} /></label></> : null}<button type="button" className="admin-secondary" onClick={() => void load(query, statusFilter, dateFrom, dateTo)}>Apply filters</button>{isSubmission ? <button type="button" className="admin-secondary admin-download" disabled={exporting} onClick={() => void downloadCsv()}><Download size={16} />{exporting ? 'Preparing…' : 'Download CSV'}</button> : null}</div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{column === 'status' && isSubmission ? <select className="admin-status-select" aria-label={`Update status for ${text(doc.title || doc.email || doc.id)}`} value={String(doc.status || 'new')} disabled={updatingStatus === doc.id} onChange={(event) => void updateSubmissionStatus(doc, event.target.value)}>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select> : text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
 }
 
 function RecordDetailPage({ slug, id }: { slug: string; id: string }) {

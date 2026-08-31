@@ -291,6 +291,10 @@ html.lafashion-loading body {
 .admin-eyebrow { font-size:12px; }
 .admin-primary, .admin-secondary { min-height:46px; font-size:14px; }
 .admin-toolbar { align-items:stretch; margin-bottom:12px; }
+.admin-date-filter { display:flex; flex-direction:column; justify-content:center; gap:4px; color:rgba(244,240,232,.68); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+.admin-date-filter input { min-height:48px; padding:0 12px; font-size:14px; }
+.admin-download { display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; }
+.admin-download:disabled { opacity:.6; cursor:wait; }
 .admin-toolbar input { min-height:48px; padding-inline:16px; font-size:15px; }
 .admin-toolbar .admin-secondary { min-width:96px; }
 .admin-table-meta { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 2px 12px; color:rgba(244,240,232,.64); font-size:13px; }
@@ -318,6 +322,7 @@ html.lafashion-loading body {
 @media (max-width:620px) {
   .admin-page-heading h1 { font-size:42px; }
   .admin-table-meta { align-items:flex-start; flex-direction:column; gap:4px; }
+  .admin-date-filter input { width:100%; }
   .admin-table-wrap { border-radius:10px; }
   .admin-table-wrap th, .admin-table-wrap td { padding:15px 14px; }
   .admin-table-wrap::after { content:'Swipe horizontally to see all columns'; display:block; padding:10px 14px; border-top:1px solid rgba(255,255,255,.07); color:rgba(244,240,232,.55); font-size:12px; }
