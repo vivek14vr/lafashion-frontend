@@ -14,13 +14,18 @@ export async function middleware(request: NextRequest) {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 5000)
       const response = await fetch(`${backendUrl}/api/users/me`, {
-        headers: cookie ? { cookie } : {},
+        headers: {
+          ...(cookie ? { cookie } : {}),
+          // Payload validates cookie-authenticated requests against its CSRF
+          // allowlist. This request is server-to-server, so provide the
+          // browser origin explicitly instead of relying on Sec-Fetch-Site.
+          origin: request.nextUrl.origin,
+        },
         cache: 'no-store',
         signal: controller.signal,
       })
       clearTimeout(timeout)
       const body = await response.json().catch(() => null) as { user?: unknown } | null
-      console.info(`[admin auth middleware] path=${pathname} cookie=${Boolean(cookie)} backend=${response.status} user=${Boolean(body?.user)}`)
       if (!response.ok || !body?.user) {
         if (isLoginRoute) return NextResponse.next()
         const loginUrl = new URL('/login', request.url)
