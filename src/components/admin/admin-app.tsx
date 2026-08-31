@@ -469,7 +469,8 @@ function AdminAppContent({ section }: { section?: string[] }) {
         await api('/users/refresh-token', { method: 'POST' })
         return api('/users/me')
       })
-      .then(() => {
+      .then((body) => {
+        if (!body?.user) throw new Error('AUTH_REQUIRED')
         if (active) setSessionReady(true)
       })
       .catch((error) => {

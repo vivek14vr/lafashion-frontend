@@ -19,7 +19,8 @@ export async function middleware(request: NextRequest) {
         signal: controller.signal,
       })
       clearTimeout(timeout)
-      if (!response.ok) {
+      const body = await response.json().catch(() => null) as { user?: unknown } | null
+      if (!response.ok || !body?.user) {
         const loginUrl = new URL('/login', request.url)
         loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
         return NextResponse.redirect(loginUrl)
