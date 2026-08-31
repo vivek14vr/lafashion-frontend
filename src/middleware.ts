@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
 
   if (!isAdminRoute && !isLoginRoute) return NextResponse.next()
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isLoginRoute) {
     const backendUrl = (process.env.PAYLOAD_BACKEND_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
     const cookie = request.headers.get('cookie')
     try {
@@ -21,9 +21,17 @@ export async function middleware(request: NextRequest) {
       clearTimeout(timeout)
       const body = await response.json().catch(() => null) as { user?: unknown } | null
       if (!response.ok || !body?.user) {
+        if (isLoginRoute) return NextResponse.next()
         const loginUrl = new URL('/login', request.url)
         loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
         return NextResponse.redirect(loginUrl)
+      }
+      if (isLoginRoute) {
+        const requestedNext = request.nextUrl.searchParams.get('next') || '/admin'
+        const destination = requestedNext === '/admin' || requestedNext.startsWith('/admin/')
+          ? requestedNext
+          : '/admin'
+        return NextResponse.redirect(new URL(destination, request.url))
       }
     } catch {
       // Fail closed if the auth service is unavailable. Never render an admin

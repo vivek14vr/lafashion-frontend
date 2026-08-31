@@ -3,10 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export function AdminLogin() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -25,8 +23,11 @@ export function AdminLogin() {
       })
       if (!response.ok) throw new Error('Invalid email or password.')
       const next = new URLSearchParams(window.location.search).get('next') || '/admin'
-      router.replace(next.startsWith('/admin') ? next : '/admin')
-      router.refresh()
+      const destination = next === '/admin' || next.startsWith('/admin/') ? next : '/admin'
+      // Force the server to evaluate the newly issued HttpOnly cookie before
+      // rendering the protected route. A client transition can race the
+      // cookie write and leave the user on the login screen.
+      window.location.replace(destination)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in.')
     } finally {
