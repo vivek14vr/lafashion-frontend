@@ -64,8 +64,21 @@ function AdminLoadingProvider({ children }: { children: ReactNode }) {
   </AdminLoaderContext.Provider>
 }
 
+const locationLabels: Record<string, string> = {
+  nyfw: 'New York Fashion Week',
+  la_fw: 'Los Angeles Fashion Week',
+  las_vegas_fw: 'Las Vegas Fashion Week',
+  milan_fw: 'Milan Fashion Week',
+  paris_fw: 'Paris Fashion Week',
+  london_fw: 'London Fashion Week',
+  delhi_fw: 'Delhi Fashion Week',
+  india_fw: 'India Fashion Week',
+  cannes_fw: 'Cannes Fashion Week',
+}
+
 function text(value: unknown): string {
   if (value == null) return '—'
+  if (Array.isArray(value)) return value.length ? value.map((item) => typeof item === 'string' ? (locationLabels[item] || item) : text(item)).join(', ') : '—'
   if (typeof value === 'object') return 'Linked record'
   return String(value)
 }
@@ -148,11 +161,14 @@ function CollectionPage({ slug }: { slug: string }) {
   const { startLoading } = useAdminLoader()
   const [data, setData] = useState<ListResponse | null>(null)
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const readOnly = slug.includes('registration')
+  const isSubmission = readOnly
   const title = labels[slug] || slug
-  const load = useCallback(async (searchTerm = '') => { const stopLoading = startLoading('Loading records…'); const search = searchTerm.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(searchTerm)}&where[or][1][email][contains]=${encodeURIComponent(searchTerm)}` : ''; try { setError(''); setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [router, slug, startLoading])
+  const load = useCallback(async (searchTerm = '', nextStatus = statusFilter) => { const stopLoading = startLoading('Loading records…'); const search = searchTerm.trim() ? `&where[or][0][title][contains]=${encodeURIComponent(searchTerm)}&where[or][1][email][contains]=${encodeURIComponent(searchTerm)}` : ''; const status = isSubmission && nextStatus ? `&where[status][equals]=${encodeURIComponent(nextStatus)}` : ''; try { setError(''); setData(await api(`/${slug}?depth=1&limit=50&sort=-createdAt${search}${status}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [isSubmission, router, slug, startLoading, statusFilter])
   useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
   async function removeEvent(doc: Doc) {
     if (slug !== 'events' || !window.confirm(`Delete “${String(doc.title || 'this event')}” permanently?`)) return
@@ -169,10 +185,26 @@ function CollectionPage({ slug }: { slug: string }) {
       stopLoading()
     }
   }
+  async function updateSubmissionStatus(doc: Doc, status: string) {
+    if (!status || status === String(doc.status || 'new')) return
+    setUpdatingStatus(doc.id)
+    const stopLoading = startLoading('Updating status…')
+    try {
+      await api(`/${slug}/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      setData((current) => current ? { ...current, docs: current.docs.map((item) => item.id === doc.id ? { ...item, status } : item) } : current)
+    } catch (err) {
+      if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login')
+      else setError(err instanceof Error ? err.message : 'Could not update status.')
+    } finally {
+      setUpdatingStatus(null)
+      stopLoading()
+    }
+  }
   const columns = useMemo(() => { const first = data?.docs[0]; if (!first) return ['id']; return Object.keys(first).filter((key) => !['id', 'updatedAt', 'createdAt', '_status'].includes(key)).slice(0, 5) }, [data])
   const fieldLabel = (column: string) => column.replace(/([A-Z])/g, ' $1').replace(/^./, (character) => character.toUpperCase())
   const recordLabel = data ? `${data.totalDocs} ${data.totalDocs === 1 ? 'record' : 'records'}` : 'Loading records…'
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review public submissions and remove records when needed.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder="Search by title or email" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} /><button type="button" className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
+  const statuses = [{ label: 'New submission', value: 'new' }, { label: 'Contacted', value: 'contacted' }, { label: 'Shortlisted', value: 'shortlisted' }, { label: 'Approved', value: 'approved' }, { label: 'Rejected', value: 'rejected' }, { label: 'Archived', value: 'archived' }]
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review submissions and move each applicant through your workflow.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder="Search by title or email" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query)} />{isSubmission ? <><label className="sr-only" htmlFor="admin-status-filter">Filter by submission status</label><select id="admin-status-filter" className="admin-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></> : null}<button type="button" className="admin-secondary" onClick={() => void load(query)}>Search</button></div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{column === 'status' && isSubmission ? <select className="admin-status-select" aria-label={`Update status for ${text(doc.title || doc.email || doc.id)}`} value={String(doc.status || 'new')} disabled={updatingStatus === doc.id} onChange={(event) => void updateSubmissionStatus(doc, event.target.value)}>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select> : text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
 }
 
 function RecordDetailPage({ slug, id }: { slug: string; id: string }) {
