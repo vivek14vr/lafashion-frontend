@@ -20,6 +20,7 @@ export async function middleware(request: NextRequest) {
       })
       clearTimeout(timeout)
       const body = await response.json().catch(() => null) as { user?: unknown } | null
+      console.info(`[admin auth middleware] path=${pathname} cookie=${Boolean(cookie)} backend=${response.status} user=${Boolean(body?.user)}`)
       if (!response.ok || !body?.user) {
         if (isLoginRoute) return NextResponse.next()
         const loginUrl = new URL('/login', request.url)

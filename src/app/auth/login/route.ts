@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     headers.append('set-cookie', normalizeAuthCookie(cookie, request.nextUrl.hostname))
   }
 
+  console.info(`[admin login proxy] backend=${response.status} cookies=${cookies.length} host=${request.nextUrl.hostname}`)
+
   return new Response(await response.arrayBuffer(), {
     status: response.status,
     headers,
