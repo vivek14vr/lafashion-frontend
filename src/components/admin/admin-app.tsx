@@ -84,6 +84,17 @@ function text(value: unknown): string {
 }
 
 function repairMojibake(value: string): string {
+  const replacements: Array<[string, string]> = [
+    ['\u00e2\u20ac\u2122', '\u2019'],
+    ['\u00e2\u20ac\u00b3', '\u2033'],
+    ['\u00e2\u20ac\u009d', '\u201d'],
+    ['\u00e2\u20ac\u009c', '\u201c'],
+    ['\u00e2\u20ac\u2013', '\u2013'],
+    ['\u00e2\u20ac\u2014', '\u2014'],
+  ]
+  let repaired = value
+  for (const [broken, corrected] of replacements) repaired = repaired.replaceAll(broken, corrected)
+  if (repaired !== value) return repaired
   if (!/[ÃÂâð�]/.test(value)) return value
   try {
     const bytes = Uint8Array.from(Array.from(value), (character) => character.charCodeAt(0) & 0xff)
