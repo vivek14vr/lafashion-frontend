@@ -223,6 +223,10 @@ function CollectionPage({ slug }: { slug: string }) {
   }
   function csvValue(field: string, value: unknown): string {
     if (value == null) return ''
+    if (field.toLowerCase() === 'locations') {
+      const locations = Array.isArray(value) ? value : [value]
+      return locations.map((location) => locationLabels[String(location)] || String(location)).join(', ')
+    }
     if (/date|At$/i.test(field)) {
       const date = new Date(String(value))
       if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10)
@@ -293,7 +297,7 @@ function RecordDetailPage({ slug, id }: { slug: string; id: string }) {
     return () => { active = false }
   }, [id, router, slug, startLoading])
   const entries = record ? Object.entries(record).filter(([key]) => !['id', 'createdAt', 'updatedAt'].includes(key)) : []
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">RECORD</p><h1>{record ? text(record.title || record.email || labels[slug] || slug) : labels[slug] || slug}</h1><p className="admin-muted">Review the complete saved record.</p></div><Link href={`/admin/${slug}`} className="admin-secondary">← Back to list</Link></div>{error ? <p className="admin-error">{error}</p> : null}{record ? <div className="admin-record-details">{entries.map(([key, value]) => <div className="admin-record-details__row" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><pre>{typeof value === 'object' ? JSON.stringify(value, null, 2) : text(value)}</pre></div>)}</div> : null}</>
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">RECORD</p><h1>{record ? text(record.title || record.email || labels[slug] || slug) : labels[slug] || slug}</h1><p className="admin-muted">Review the complete saved record.</p></div><Link href={`/admin/${slug}`} className="admin-secondary">← Back to list</Link></div>{error ? <p className="admin-error">{error}</p> : null}{record ? <div className="admin-record-details">{entries.map(([key, value]) => <div className="admin-record-details__row" key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong><pre>{Array.isArray(value) ? text(value) : typeof value === 'object' ? JSON.stringify(value, null, 2) : text(value)}</pre></div>)}</div> : null}</>
 }
 
 type EventFormData = { title: string; date: string; venue: string; excerpt: string; ticketUrl: string; portraitImage: string; bannerImage: string }
