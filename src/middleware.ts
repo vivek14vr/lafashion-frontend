@@ -1,16 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
   const isLoginRoute = pathname === '/login'
 
   if (!isAdminRoute && !isLoginRoute) return NextResponse.next()
 
-  // Authentication is verified client-side by AdminApp through the same-origin
-  // Payload endpoints. Avoid a server-to-server cookie check here: the browser
-  // receives the auth cookie from the login POST, then follows the redirect to
-  // /admin, where the client can present that cookie directly to Nginx/Payload.
+  if (isAdminRoute) {
+    const backendUrl = (process.env.PAYLOAD_BACKEND_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
+    const cookie = request.headers.get('cookie')
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+      const response = await fetch(`${backendUrl}/api/users/me`, {
+        headers: cookie ? { cookie } : {},
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      if (!response.ok) {
+        const loginUrl = new URL('/login', request.url)
+        loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
+        return NextResponse.redirect(loginUrl)
+      }
+    } catch {
+      // Fail closed if the auth service is unavailable. Never render an admin
+      // route when the server cannot verify the session.
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   return NextResponse.next()
 }
 
