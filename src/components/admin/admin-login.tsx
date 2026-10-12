@@ -2,11 +2,13 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { Eye, EyeOff } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 
 export function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -38,7 +40,8 @@ export function AdminLogin() {
   return (
     <main className="admin-login">
       <div className="admin-login__card">
-        <Link href="/" className="admin-login__logo">
+        {/* Browser extensions can decorate anchors before React hydrates this client form. */}
+        <Link href="/" className="admin-login__logo" suppressHydrationWarning>
           <Image src="/logo.png" alt="LA Fashion Closet" width={260} height={80} priority unoptimized />
         </Link>
         <div className="admin-login__heading">
@@ -48,7 +51,7 @@ export function AdminLogin() {
         </div>
         <form onSubmit={submit} className="admin-form">
           <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" /></label>
-          <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></label>
+          <label>Password<div className="admin-password-field"><input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /><button type="button" className="admin-password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}</button></div></label>
           {error ? <p className="admin-error">{error}</p> : null}
           <button className="admin-primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}<span aria-hidden>↗</span></button>
         </form>

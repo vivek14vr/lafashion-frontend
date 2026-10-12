@@ -1,4 +1,4 @@
-import type { EventItem, GalleryItem, Media, PayloadListResponse } from './types'
+import type { EventItem, GalleryItem, Media, PayloadListResponse, PressReleaseItem } from './types'
 
 // Browser requests must stay on the current origin so they use the production
 // /api proxy. Server components can talk to Payload directly without making a
@@ -52,6 +52,42 @@ export function getMediaUrl(media?: Media | string | null): string | null {
   }
 
   return raw.startsWith('/') ? raw : `/${raw}`
+}
+
+/** Press assets must come from Payload's private file route (or the configured S3 origin). */
+export function getPressMediaUrl(media?: Media | string | null): string | null {
+  if (!media || typeof media === 'string' || !media.url) return null
+
+  try {
+    const rawURL = media.url.trim()
+    const parsed = new URL(rawURL, 'http://payload.local')
+    const trustedHosts = new Set(['payload.local', 'localhost', '127.0.0.1'])
+    for (const candidate of [SERVER_API_URL, PUBLIC_API_URL]) {
+      try {
+        trustedHosts.add(new URL(candidate).hostname)
+      } catch {
+        // Ignore malformed optional URLs and keep the safe defaults.
+      }
+    }
+    const isRelativePayloadFile = rawURL.startsWith('/api/media/file/')
+    const isPayloadFile =
+      parsed.pathname.startsWith('/api/media/file/') &&
+      (isRelativePayloadFile || trustedHosts.has(parsed.hostname))
+    const isS3Object = parsed.hostname.endsWith('.amazonaws.com')
+    if (!isPayloadFile && !isS3Object) return null
+
+    // Keep private Press assets same-origin so Next's image optimizer uses the
+    // frontend /api proxy and Payload can issue a short-lived S3 download URL.
+    if (isS3Object && media.filename) {
+      const prefix = media.prefix ? `?prefix=${encodeURIComponent(media.prefix)}` : ''
+      return `/api/media/file/${encodeURIComponent(media.filename)}${prefix}`
+    }
+    if (isPayloadFile) return `${parsed.pathname}${parsed.search}`
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 async function fetchPayload<T>(path: string, init?: RequestInit): Promise<T> {
@@ -184,6 +220,54 @@ export async function getGalleryBySlug(slug: string) {
   })
 
   const data = await fetchPayload<PayloadListResponse<GalleryItem>>(`/api/galleries?${query}`)
+  return data.docs[0] ?? null
+}
+
+export async function getPressReleases(options?: { page?: number; limit?: number; search?: string }) {
+  const page = options?.page ?? 1
+  const limit = options?.limit ?? 12
+  const now = new Date()
+  now.setSeconds(0, 0)
+  const query = new URLSearchParams({
+    'where[and][0][published][equals]': 'true',
+    'where[and][1][publishDate][less_than_equal]': now.toISOString(),
+    sort: '-featured,-publishDate,-createdAt',
+    depth: '1',
+    limit: String(limit),
+    page: String(page),
+    'select[title]': 'true',
+    'select[slug]': 'true',
+    'select[designerName]': 'true',
+    'select[brandName]': 'true',
+    'select[excerpt]': 'true',
+    'select[portraitImage]': 'true',
+    'select[publishDate]': 'true',
+    'select[featured]': 'true',
+  })
+  const term = options?.search?.trim()
+  if (term) {
+    query.set('where[and][2][or][0][title][contains]', term)
+    query.set('where[and][2][or][1][designerName][contains]', term)
+    query.set('where[and][2][or][2][brandName][contains]', term)
+  }
+  return fetchPayload<PayloadListResponse<PressReleaseItem>>(`/api/press-releases?${query}`, {
+    headers: { 'x-site-public-read': 'true' },
+  })
+}
+
+export async function getPressReleaseBySlug(slug: string) {
+  const now = new Date()
+  now.setSeconds(0, 0)
+  const query = new URLSearchParams({
+    'where[and][0][slug][equals]': slug,
+    'where[and][1][published][equals]': 'true',
+    'where[and][2][publishDate][less_than_equal]': now.toISOString(),
+    depth: '2',
+    limit: '1',
+  })
+  const data = await fetchPayload<PayloadListResponse<PressReleaseItem>>(`/api/press-releases?${query}`, {
+    headers: { 'x-site-public-read': 'true' },
+  })
   return data.docs[0] ?? null
 }
 

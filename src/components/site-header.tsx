@@ -10,6 +10,7 @@ import { registrationLinks } from '@/lib/registration-links'
 const links = [
   { href: '/events', label: 'Events' },
   { href: '/galleries', label: 'Galleries' },
+  { href: '/press-releases', label: 'Press' },
   { href: '/about', label: 'About' },
 ]
 

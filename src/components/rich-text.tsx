@@ -7,6 +7,16 @@ const IS_STRIKETHROUGH = 4
 const IS_UNDERLINE = 8
 const IS_CODE = 16
 
+function safeHref(value: string): string {
+  try {
+    const parsed = new URL(value, 'https://lafashioncloset.local')
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return value
+  } catch {
+    // Fall through to a harmless placeholder for malformed editor content.
+  }
+  return '#'
+}
+
 function renderText(node: LexicalNode, key: string): ReactNode {
   let content: ReactNode = node.text ?? ''
   const format = typeof node.format === 'number' ? node.format : 0
@@ -81,17 +91,20 @@ function renderNode(node: LexicalNode, key: string): ReactNode {
         </blockquote>
       )
     case 'link':
-      return (
-        <a
-          key={key}
-          href={node.url || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[var(--champagne)] underline-offset-4 hover:underline"
-        >
-          {renderChildren(node.children, key)}
-        </a>
-      )
+      {
+        const href = node.url || node.fields?.url || '#'
+        return (
+          <a
+            key={key}
+            href={safeHref(href)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--champagne)] underline-offset-4 hover:underline"
+          >
+            {renderChildren(node.children, key)}
+          </a>
+        )
+      }
     default:
       if (node.children?.length) {
         return <div key={key}>{renderChildren(node.children, key)}</div>

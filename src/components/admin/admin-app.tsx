@@ -5,7 +5,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, CalendarDays, ChevronRight, Download, FolderOpen, Images, LayoutDashboard, LogOut, Menu, Pencil, Users, X } from 'lucide-react'
 
 type Doc = Record<string, unknown> & { id: string; createdAt?: string; updatedAt?: string }
@@ -16,16 +16,20 @@ const nav = [
   { href: '/admin/events', label: 'Events', icon: CalendarDays },
   { href: '/admin/galleries', label: 'Galleries', icon: Images },
   { href: '/admin/media', label: 'Media library', icon: FolderOpen },
+  { href: '/admin/press-releases', label: 'Press releases', icon: Pencil },
   { href: '/admin/registrations', label: 'Model registrations', icon: Users },
   { href: '/admin/community-registrations', label: 'Community registrations', icon: Users },
   { href: '/admin/designer-registrations', label: 'Designer registrations', icon: Users },
   { href: '/admin/home-destinations', label: 'Homepage city snaps', icon: BarChart3 },
 ]
 
+const overviewNav = nav.filter(({ href }) => href !== '/admin' && href !== '/admin/home-destinations')
+
 const labels: Record<string, string> = {
   events: 'Events (nights & tickets)',
   galleries: 'Galleries (photo archives)',
   media: 'Media library',
+  'press-releases': 'Press releases',
   registrations: 'Model registrations',
   'community-registrations': 'Community registrations',
   'designer-registrations': 'Designer registrations',
@@ -110,6 +114,51 @@ function relationId(value: unknown): string {
   return ''
 }
 
+function withAdminPreviewUrl(doc: Doc): Doc {
+  const sizes = doc.sizes as Record<string, { url?: unknown }> | undefined
+  const generatedThumbnail = sizes?.adminThumbnail?.url
+
+  if (typeof generatedThumbnail === 'string' && generatedThumbnail) {
+    return { ...doc, url: generatedThumbnail }
+  }
+
+  const rawUrl = typeof doc.url === 'string' ? doc.url : ''
+  if (!rawUrl) return doc
+
+  try {
+    const url = new URL(rawUrl)
+    if (url.hostname === 'res.cloudinary.com' && url.pathname.includes('/image/upload/')) {
+      url.pathname = url.pathname.replace(
+        '/image/upload/',
+        '/image/upload/w_360,h_360,c_fill,f_auto,q_auto/',
+      )
+      return { ...doc, url: url.toString() }
+    }
+  } catch {
+    // Relative and non-standard URLs are already suitable for the existing proxy.
+  }
+
+  return doc
+}
+
+function isPrivatePressMedia(doc: Doc | undefined): boolean {
+  if (!doc || typeof doc.url !== 'string' || !doc.url) return false
+  try {
+    const rawURL = doc.url.trim()
+    const url = new URL(rawURL, window.location.origin)
+    const isRelativePayloadFile = rawURL.startsWith('/api/media/file/')
+    const isTrustedPayloadFile = url.pathname.startsWith('/api/media/file/') && (
+      isRelativePayloadFile ||
+      url.origin === window.location.origin ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1'
+    )
+    return isTrustedPayloadFile || url.hostname.endsWith('.amazonaws.com')
+  } catch {
+    return false
+  }
+}
+
 function localDateTime(value: unknown): string {
   if (!value) return ''
   const date = new Date(String(value))
@@ -173,8 +222,8 @@ function Sidebar({ open, close }: { open: boolean; close: () => void }) {
 
 function Overview() {
   const [counts, setCounts] = useState<Record<string, number>>({})
-  useEffect(() => { Promise.all(nav.slice(1, 7).map(async (item) => { const slug = item.href.split('/').pop()!; const response = await api(`/${slug}?limit=1`).catch(() => ({ totalDocs: 0 })); return [slug, response.totalDocs] as const })).then((items) => setCounts(Object.fromEntries(items))) }, [])
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">CONTENT STUDIO</p><h1>LA Fashion Closet</h1><p className="admin-muted">A focused workspace for the stories, images, and people behind the site.</p></div><Link href="/" className="admin-secondary">View website <ChevronRight size={16} /></Link></div><div className="admin-stat-grid">{nav.slice(1, 7).map(({ href, label, icon: Icon }) => <Link href={href} className="admin-stat" key={href}><span className="admin-stat__icon"><Icon size={19} /></span><span><strong>{counts[href.split('/').pop()!] ?? '—'}</strong><small>{label}</small></span><ChevronRight size={17} /></Link>)}</div><div className="admin-welcome"><p className="admin-eyebrow">QUICK START</p><h2>Keep the public site alive</h2><p className="admin-muted">Create an event, upload a batch of photos, then assemble those images into a gallery or homepage city card.</p><div className="admin-actions"><Link href="/admin/events/new" className="admin-primary">Create event</Link><Link href="/admin/media" className="admin-secondary">Upload media</Link></div></div></>
+  useEffect(() => { Promise.all(overviewNav.map(async (item) => { const slug = item.href.split('/').pop()!; const response = await api(`/${slug}?limit=1`).catch(() => ({ totalDocs: 0 })); return [slug, response.totalDocs] as const })).then((items) => setCounts(Object.fromEntries(items))) }, [])
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">CONTENT STUDIO</p><h1>LA Fashion Closet</h1><p className="admin-muted">A focused workspace for the stories, images, and people behind the site.</p></div><Link href="/" className="admin-secondary">View website <ChevronRight size={16} /></Link></div><div className="admin-stat-grid">{overviewNav.map(({ href, label, icon: Icon }) => <Link href={href} className="admin-stat" key={href}><span className="admin-stat__icon"><Icon size={19} /></span><span><strong>{counts[href.split('/').pop()!] ?? '—'}</strong><small>{label}</small></span><ChevronRight size={17} /></Link>)}</div><div className="admin-welcome"><p className="admin-eyebrow">QUICK START</p><h2>Keep the public site alive</h2><p className="admin-muted">Create an event, upload a batch of photos, then assemble those images into a gallery or homepage city card.</p><div className="admin-actions"><Link href="/admin/events/new" className="admin-primary">Create event</Link><Link href="/admin/media" className="admin-secondary">Upload media</Link></div></div></>
 }
 
 function CollectionPage({ slug }: { slug: string }) {
@@ -196,8 +245,12 @@ function CollectionPage({ slug }: { slug: string }) {
     const params = new URLSearchParams({ depth: '1', limit: String(limit), page: String(page), sort: '-createdAt' })
     const term = searchTerm.trim()
     if (term) {
-      params.set('where[or][0][title][contains]', term)
-      params.set('where[or][1][email][contains]', term)
+      const searchFields = slug === 'press-releases'
+        ? ['title', 'designerName', 'brandName']
+        : ['title', 'email']
+      searchFields.forEach((field, index) => {
+        params.set(`where[or][${index}][${field}][contains]`, term)
+      })
     }
     if (isSubmission && nextStatus) params.set('where[status][equals]', nextStatus)
     if (isSubmission && from) {
@@ -209,19 +262,22 @@ function CollectionPage({ slug }: { slug: string }) {
       if (!Number.isNaN(end.getTime())) params.set('where[createdAt][less_than]', new Date(end.getTime() + 86_400_000).toISOString())
     }
     return params.toString()
-  }, [isSubmission])
+  }, [isSubmission, slug])
   const load = useCallback(async (searchTerm = '', nextStatus = '', from = '', to = '') => { const stopLoading = startLoading('Loading records…'); try { setError(''); setData(await api(`/${slug}?${buildQuery(searchTerm, nextStatus, from, to)}`)) } catch (err) { if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login'); else setError(err instanceof Error ? err.message : 'Could not load records.') } finally { stopLoading() } }, [buildQuery, router, slug, startLoading])
   useEffect(() => { const timer = window.setTimeout(() => { void load() }, 0); return () => window.clearTimeout(timer) }, [load])
-  async function removeEvent(doc: Doc) {
-    if (slug !== 'events' || !window.confirm(`Delete “${String(doc.title || 'this event')}” permanently?`)) return
+  async function removeRecord(doc: Doc) {
+    if (slug !== 'events' && slug !== 'press-releases') return
+    const label = slug === 'press-releases' ? 'press release' : 'event'
+    const name = String(doc.title || doc.designerName || doc.email || 'this record')
+    if (!window.confirm(`Delete “${name}” permanently?`)) return
     setDeleting(doc.id)
-    const stopLoading = startLoading('Deleting event…')
+    const stopLoading = startLoading(`Deleting ${label}…`)
     try {
-      await api(`/events/${doc.id}`, { method: 'DELETE' })
+      await api(`/${slug}/${doc.id}`, { method: 'DELETE' })
       setData((current) => current ? { ...current, docs: current.docs.filter((item) => item.id !== doc.id), totalDocs: Math.max(0, current.totalDocs - 1) } : current)
     } catch (err) {
       if (err instanceof Error && err.message === 'AUTH_REQUIRED') router.replace('/login')
-      else setError(err instanceof Error ? err.message : 'Could not delete event.')
+      else setError(err instanceof Error ? err.message : `Could not delete ${label}.`)
     } finally {
       setDeleting(null)
       stopLoading()
@@ -296,7 +352,7 @@ function CollectionPage({ slug }: { slug: string }) {
   const fieldLabel = (column: string) => column.replace(/([A-Z])/g, ' $1').replace(/^./, (character) => character.toUpperCase())
   const recordLabel = data ? `${data.totalDocs} ${data.totalDocs === 1 ? 'record' : 'records'}` : 'Loading records…'
   const statuses = [{ label: 'New submission', value: 'new' }, { label: 'Contacted', value: 'contacted' }, { label: 'Shortlisted', value: 'shortlisted' }, { label: 'Approved', value: 'approved' }, { label: 'Rejected', value: 'rejected' }, { label: 'Archived', value: 'archived' }]
-  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review submissions and move each applicant through your workflow.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder="Search by title or email" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query, statusFilter, dateFrom, dateTo)} />{isSubmission ? <><label className="sr-only" htmlFor="admin-status-filter">Filter by submission status</label><select id="admin-status-filter" className="admin-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><label className="admin-date-filter">From<input aria-label="Submitted from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label><label className="admin-date-filter">To<input aria-label="Submitted to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} /></label></> : null}<button type="button" className="admin-secondary" onClick={() => void load(query, statusFilter, dateFrom, dateTo)}>Apply filters</button>{isSubmission ? <button type="button" className="admin-secondary admin-download" disabled={exporting} onClick={() => void downloadCsv()}><Download size={16} />{exporting ? 'Preparing…' : 'Download CSV'}</button> : null}</div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{column === 'status' && isSubmission ? <select className="admin-status-select" aria-label={`Update status for ${text(doc.title || doc.email || doc.id)}`} value={String(doc.status || 'new')} disabled={updatingStatus === doc.id} onChange={(event) => void updateSubmissionStatus(doc, event.target.value)}>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select> : text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeEvent(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
+  return <><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>{title}</h1><p className="admin-muted">{readOnly ? 'Review submissions and move each applicant through your workflow.' : 'Manage the content shown across the public website.'}</p></div>{!readOnly && <Link href={`/admin/${slug}/new`} className="admin-primary">Create new</Link>}</div><div className="admin-toolbar"><label className="sr-only" htmlFor="admin-record-search">Search records</label><input id="admin-record-search" placeholder={slug === 'press-releases' ? 'Search by title, designer, or brand' : 'Search by title or email'} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(query, statusFilter, dateFrom, dateTo)} />{isSubmission ? <><label className="sr-only" htmlFor="admin-status-filter">Filter by submission status</label><select id="admin-status-filter" className="admin-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><label className="admin-date-filter">From<input aria-label="Submitted from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label><label className="admin-date-filter">To<input aria-label="Submitted to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} /></label></> : null}<button type="button" className="admin-secondary" onClick={() => void load(query, statusFilter, dateFrom, dateTo)}>Apply filters</button>{isSubmission ? <button type="button" className="admin-secondary admin-download" disabled={exporting} onClick={() => void downloadCsv()}><Download size={16} />{exporting ? 'Preparing…' : 'Download CSV'}</button> : null}</div>{error ? <p className="admin-error" role="alert">{error}</p> : null}<div className="admin-table-meta"><strong>{recordLabel}</strong><span>{data?.docs.length ? 'Select Open to review the full record.' : 'Your saved records will appear here.'}</span></div><div className="admin-table-wrap"><table><caption className="sr-only">{title}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{fieldLabel(column)}</th>)}<th scope="col">Action</th></tr></thead><tbody>{data?.docs.map((doc) => <tr key={doc.id}>{columns.map((column) => <td key={column}>{column === 'status' && isSubmission ? <select className="admin-status-select" aria-label={`Update status for ${text(doc.title || doc.email || doc.id)}`} value={String(doc.status || 'new')} disabled={updatingStatus === doc.id} onChange={(event) => void updateSubmissionStatus(doc, event.target.value)}>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select> : text(doc[column])}</td>)}<td><div className="admin-table-actions"><Link className="admin-table-link" href={`/admin/${slug}/${doc.id}`}>Open<span className="sr-only"> {text(doc.title || doc.email || doc.id)}</span></Link>{slug === 'events' || slug === 'press-releases' ? <button type="button" className="admin-table-delete" disabled={deleting === doc.id} onClick={() => void removeRecord(doc)}>{deleting === doc.id ? 'Deleting…' : 'Delete'}</button> : null}</div></td></tr>)}</tbody></table>{data && data.docs.length === 0 ? <div className="admin-empty">No records found. Try a different search or create a new record.</div> : null}</div></>
 }
 
 function RecordDetailPage({ slug, id }: { slug: string; id: string }) {
@@ -389,24 +445,359 @@ function GalleryForm() {
   return <form className="admin-form admin-gallery-form" onSubmit={save}><div className="admin-page-heading"><div><p className="admin-eyebrow">WEBSITE</p><h1>Create gallery</h1><p className="admin-muted">Create a photo archive for a past fashion show.</p></div><button className="admin-primary" disabled={saving || !data.images.length}>{saving ? 'Creating…' : 'Create gallery'}</button></div>{error ? <p className="admin-error">{error}</p> : null}<div className="admin-gallery-details">{field('title', 'Gallery title', true)}<label className="admin-form"><span>Gallery type *</span><select required value={data.source} onChange={(event) => setData((current) => ({ ...current, source: event.target.value, event: event.target.value === 'platform' ? current.event : '' }))}><option value="standalone">Standalone past show</option><option value="platform">Linked to a platform event</option></select></label>{data.source === 'platform' ? <label className="admin-form"><span>Link to past event (optional)</span><select value={data.event} onChange={(event) => setData((current) => ({ ...current, event: event.target.value }))}><option value="">No linked event</option>{events.map((event) => <option value={event.id} key={event.id}>{String(event.title || event.id)}{event.date ? ` — ${new Date(String(event.date)).toLocaleDateString()}` : ''}</option>)}</select>{events.length === 0 ? <small className="admin-muted">No events are available yet.</small> : null}</label> : null}{field('date', 'Show date')}{field('location', 'Location')}{field('excerpt', 'Short blurb')}</div><MediaChoice label="Cover image (optional)" value={data.coverImage} media={media} onChange={(value) => setData((current) => ({ ...current, coverImage: value }))} /><section className="admin-gallery-picker"><div className="admin-gallery-picker__heading"><div><h2>Gallery photos</h2><p className="admin-muted">Choose images from one folder. Selected: {data.images.length}</p></div>{pickerFolder ? <div className="admin-gallery-picker__actions"><button type="button" className="admin-secondary" onClick={toggleFolderImages}>{allVisibleSelected ? 'Clear folder selection' : `Select all ${visibleMedia.length} images`}</button><button type="button" className="admin-secondary" onClick={() => setPickerFolder('')}>← Back to folders</button></div> : null}</div>{pickerFolder === '' ? <div className="admin-picker-folders">{folderCards.map((folder) => <button type="button" className="admin-picker-folder" key={folder.id} onClick={() => setPickerFolder(folder.id)}><FolderOpen size={20} /><strong>{folder.name}</strong><small>{media.filter((image) => folder.id === '__unsorted__' ? !image.folder : image.folder === folder.id).length} images</small></button>)}</div> : visibleMedia.length ? <div className="admin-destination-picker__grid">{visibleMedia.map((image) => { const selected = data.images.includes(image.id); return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(image.id)} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div> : <p className="admin-muted">No images in this folder yet.</p>}</section><div className="admin-form-actions"><button className="admin-primary" disabled={saving || !data.images.length}>{saving ? 'Creating…' : 'Create gallery'}</button></div></form>
 }
 
-function MediaChoice({ label, value, media, onChange, required = false }: { label: string; value: string; media: Doc[]; onChange: (value: string) => void; required?: boolean }) {
+type PressReleaseFormData = {
+  title: string
+  designerName: string
+  brandName: string
+  event: string
+  excerpt: string
+  body: string
+  bodyHtml: string
+  websiteUrl: string
+  instagramUrl: string
+  portraitImage: string
+  images: string[]
+  publishDate: string
+  featured: boolean
+  published: boolean
+}
+
+function lexicalText(value: unknown): string {
+  if (!value || typeof value !== 'object') return ''
+  const walk = (node: unknown): string => {
+    if (!node || typeof node !== 'object') return ''
+    const item = node as { text?: string; type?: string; children?: unknown[] }
+    if (item.type === 'text') return item.text || ''
+    const content = (item.children || []).map(walk).join('')
+    return item.type === 'paragraph' || item.type === 'heading' ? `${content}\n\n` : content
+  }
+  return walk(value).trim()
+}
+
+function escapeHtml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+}
+
+function lexicalHtml(value: unknown): string {
+  if (!value || typeof value !== 'object') return ''
+  const render = (node: unknown): string => {
+    if (!node || typeof node !== 'object') return ''
+    const item = node as { type?: string; text?: string; format?: number; tag?: string; url?: string; fields?: { url?: string }; listType?: string; children?: unknown[] }
+    if (item.type === 'text') {
+      let content = escapeHtml(item.text || '')
+      const format = typeof item.format === 'number' ? item.format : 0
+      if (format & 1) content = `<strong>${content}</strong>`
+      if (format & 2) content = `<em>${content}</em>`
+      if (format & 4) content = `<s>${content}</s>`
+      if (format & 8) content = `<u>${content}</u>`
+      if (format & 16) content = `<code>${content}</code>`
+      return content
+    }
+    const children = (item.children || []).map(render).join('')
+    if (item.type === 'linebreak') return '<br />'
+    if (item.type === 'paragraph') return `<p>${children || '<br />'}</p>`
+    if (item.type === 'heading') return `<${['h1', 'h2', 'h3', 'h4'].includes(item.tag || '') ? item.tag : 'h2'}>${children}</${['h1', 'h2', 'h3', 'h4'].includes(item.tag || '') ? item.tag : 'h2'}>`
+    if (item.type === 'list') return `<${item.listType === 'number' ? 'ol' : 'ul'}>${children}</${item.listType === 'number' ? 'ol' : 'ul'}>`
+    if (item.type === 'listitem') return `<li>${children}</li>`
+    if (item.type === 'quote') return `<blockquote>${children}</blockquote>`
+    if (item.type === 'link') { const fields = item.fields as { url?: string } | undefined; return `<a href="${escapeHtml(item.url || fields?.url || '')}">${children}</a>` }
+    return children
+  }
+  const root = value as { root?: { children?: unknown[] } }
+  return (root.root?.children || []).map(render).join('')
+}
+
+function htmlToLexical(html: string) {
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const parseInline = (node: Node, format = 0): Record<string, unknown>[] => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ? [{ type: 'text', version: 1, detail: 0, format, mode: 'normal', style: '', text: node.textContent }] : []
+    if (!(node instanceof HTMLElement)) return node.nodeName.toLowerCase() === 'br' ? [{ type: 'linebreak', version: 1 }] : []
+    const tag = node.tagName.toLowerCase()
+    const nextFormat = format | (tag === 'strong' || tag === 'b' ? 1 : 0) | (tag === 'em' || tag === 'i' ? 2 : 0) | (tag === 's' || tag === 'del' ? 4 : 0) | (tag === 'u' ? 8 : 0) | (tag === 'code' ? 16 : 0)
+    if (tag === 'a') { const url = node.getAttribute('href') || ''; return [{ type: 'link', version: 2, url, fields: { url, newTab: true }, children: Array.from(node.childNodes).flatMap((child) => parseInline(child, nextFormat)) }] }
+    return Array.from(node.childNodes).flatMap((child) => parseInline(child, nextFormat))
+  }
+  const parseBlock = (node: Node): Record<string, unknown>[] => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent?.trim() ? [{ type: 'paragraph', version: 1, direction: 'ltr', format: '', indent: 0, children: parseInline(node) }] : []
+    if (!(node instanceof HTMLElement)) return []
+    const tag = node.tagName.toLowerCase()
+    const children = Array.from(node.childNodes).flatMap((child) => parseInline(child))
+    if (tag === 'p' || tag === 'div') return [{ type: 'paragraph', version: 1, direction: 'ltr', format: '', indent: 0, children }]
+    if (/^h[1-4]$/.test(tag)) return [{ type: 'heading', version: 1, tag, direction: 'ltr', format: '', indent: 0, children }]
+    if (tag === 'blockquote') return [{ type: 'quote', version: 1, direction: 'ltr', format: '', indent: 0, children }]
+    if (tag === 'ul' || tag === 'ol') return [{ type: 'list', version: 1, listType: tag === 'ol' ? 'number' : 'bullet', start: 1, tag: 'ul', direction: 'ltr', format: '', indent: 0, children: Array.from(node.children).flatMap((child) => parseBlock(child)) }]
+    if (tag === 'li') return [{ type: 'listitem', version: 1, value: 1, direction: 'ltr', format: '', indent: 0, children }]
+    return children.length ? [{ type: 'paragraph', version: 1, direction: 'ltr', format: '', indent: 0, children }] : []
+  }
+  const children = Array.from(template.content.childNodes).flatMap(parseBlock)
+  return { root: { type: 'root', version: 1, direction: 'ltr', format: '', indent: 0, children } }
+}
+
+function pressBody(value: string, html?: string) {
+  if (html && typeof document !== 'undefined') return htmlToLexical(html)
+  return {
+    root: {
+      type: 'root', version: 1, direction: 'ltr', format: '', indent: 0,
+      children: value.split(/\n\s*\n/).filter((paragraph) => paragraph.trim()).map((paragraph) => ({
+        type: 'paragraph', version: 1, direction: 'ltr', format: '', indent: 0,
+        children: [{ type: 'text', version: 1, detail: 0, format: 0, mode: 'normal', style: '', text: paragraph.trim() }],
+      })),
+    },
+  }
+}
+
+function PressRichTextEditor({ value, onChange }: { value: string; onChange: (html: string, text: string) => void }) {
+  const editorRef = useRef<HTMLDivElement>(null)
+  const [activeFormat, setActiveFormat] = useState('')
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value
+  }, [value])
+  function command(commandName: string, commandValue?: string, activeKey = commandName) {
+    editorRef.current?.focus()
+    document.execCommand(commandName, false, commandValue)
+    const html = editorRef.current?.innerHTML || ''
+    onChange(html, lexicalText(htmlToLexical(html)))
+    setActiveFormat(activeKey)
+  }
+  return <div className="admin-rich-text-editor">
+    <div className="admin-rich-text-editor__toolbar" role="toolbar" aria-label="Formatting tools">
+      <button type="button" className={activeFormat === 'bold' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('bold')} aria-label="Bold" aria-pressed={activeFormat === 'bold'}>B</button>
+      <button type="button" className={activeFormat === 'italic' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('italic')} aria-label="Italic" aria-pressed={activeFormat === 'italic'}><em>I</em></button>
+      <button type="button" className={activeFormat === 'heading' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('formatBlock', 'h2', 'heading')} aria-label="Heading" aria-pressed={activeFormat === 'heading'}>H</button>
+      <button type="button" className={activeFormat === 'insertUnorderedList' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('insertUnorderedList')} aria-label="Bulleted list" aria-pressed={activeFormat === 'insertUnorderedList'}>•</button>
+      <button type="button" className={activeFormat === 'paragraph' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('formatBlock', 'p', 'paragraph')} aria-label="Paragraph" aria-pressed={activeFormat === 'paragraph'}>¶</button>
+    </div>
+    <div ref={editorRef} className="admin-rich-text-editor__input" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="Designer write-up" onInput={(event) => { const html = event.currentTarget.innerHTML; onChange(html, lexicalText(htmlToLexical(html))) }} />
+    <p className="admin-rich-text-editor__hint">Use the formatting buttons to structure the story. Links can be pasted into the editor.</p>
+  </div>
+}
+
+function pressMediaPagePath(page: number) {
+  const query = new URLSearchParams({
+    limit: '24',
+    page: String(page),
+    sort: '-createdAt',
+    'select[filename]': 'true',
+    'select[url]': 'true',
+    'select[prefix]': 'true',
+    'select[folder]': 'true',
+    'select[sizes]': 'true',
+  })
+  return `/media?${query}`
+}
+
+function PressReleaseForm({ id }: { id?: string }) {
+  const router = useRouter()
+  const { startLoading } = useAdminLoader()
+  const [data, setData] = useState<PressReleaseFormData>({ title: '', designerName: '', brandName: '', event: '', excerpt: '', body: '', bodyHtml: '<p><br /></p>', websiteUrl: '', instagramUrl: '', portraitImage: '', images: [], publishDate: localDateTime(new Date().toISOString()), featured: false, published: false })
+  const [media, setMedia] = useState<Doc[]>([])
+  const [mediaPage, setMediaPage] = useState(1)
+  const [mediaTotalPages, setMediaTotalPages] = useState(1)
+  const [mediaTotalDocs, setMediaTotalDocs] = useState(0)
+  const [mediaRenderLimit, setMediaRenderLimit] = useState(48)
+  const [loadingMoreMedia, setLoadingMoreMedia] = useState(false)
+  const [mediaFolders, setMediaFolders] = useState<string[]>([])
+  const [events, setEvents] = useState<Doc[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const initialDataRef = useRef<string | null>(null)
+  const allowNavigationRef = useRef(false)
+  const historyIndexRef = useRef(0)
+  const restoringHistoryRef = useRef(false)
+  useEffect(() => {
+    const serialized = JSON.stringify(data)
+    if (initialDataRef.current === null) {
+      initialDataRef.current = serialized
+      return
+    }
+    setDirty(serialized !== initialDataRef.current)
+  }, [data])
+  useEffect(() => {
+    if (!dirty) return
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (allowNavigationRef.current) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    const confirmNavigation = (event: MouseEvent) => {
+      if (allowNavigationRef.current) return
+      const target = event.target instanceof Element ? event.target.closest('a') : null
+      const href = target?.getAttribute('href')
+      if (!target || !href || href.startsWith('#') || target.getAttribute('target') === '_blank') return
+      if (!window.confirm('Discard your unsaved press release changes?')) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    const historyKey = '__pressReleaseHistoryIndex'
+    const currentState = window.history.state && typeof window.history.state === 'object' ? window.history.state : {}
+    const currentIndex = typeof (currentState as Record<string, unknown>)[historyKey] === 'number'
+      ? Number((currentState as Record<string, unknown>)[historyKey])
+      : 0
+    historyIndexRef.current = currentIndex
+    if (typeof (currentState as Record<string, unknown>)[historyKey] !== 'number') {
+      window.history.replaceState({ ...currentState, [historyKey]: currentIndex }, '', window.location.href)
+    }
+    const confirmHistoryNavigation = (event: PopStateEvent) => {
+      const nextState = event.state && typeof event.state === 'object' ? event.state as Record<string, unknown> : {}
+      const nextIndex = typeof nextState[historyKey] === 'number' ? Number(nextState[historyKey]) : historyIndexRef.current - 1
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false
+        historyIndexRef.current = nextIndex
+        return
+      }
+      if (allowNavigationRef.current || window.confirm('Discard your unsaved press release changes?')) {
+        historyIndexRef.current = nextIndex
+        return
+      }
+      const delta = historyIndexRef.current - nextIndex
+      if (delta) {
+        restoringHistoryRef.current = true
+        window.history.go(delta)
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    document.addEventListener('click', confirmNavigation, true)
+    window.addEventListener('popstate', confirmHistoryNavigation)
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload)
+      document.removeEventListener('click', confirmNavigation, true)
+      window.removeEventListener('popstate', confirmHistoryNavigation)
+    }
+  }, [dirty])
+  useEffect(() => {
+    let active = true
+    const stopLoading = startLoading(id ? 'Loading press release…' : 'Loading press studio…')
+    void Promise.all([api(pressMediaPagePath(1)), api('/globals/media-folders').catch(() => ({ folders: [] })), api('/events?limit=200&sort=-date').catch(() => ({ docs: [] })), id ? api(`/press-releases/${id}?depth=2`) : Promise.resolve(null)])
+      .then(([mediaData, folderData, eventData, release]) => {
+        if (!active) return
+        const pageDocs: Doc[] = (mediaData.docs || []).map(withAdminPreviewUrl)
+        const selectedDocs: Doc[] = release
+          ? [release.portraitImage, ...(Array.isArray(release.images) ? release.images : [])]
+              .filter((item): item is Doc => Boolean(item && typeof item === 'object' && 'id' in item))
+              .map(withAdminPreviewUrl)
+          : []
+        setMedia(Array.from(new Map([...pageDocs, ...selectedDocs].map((item) => [item.id, item])).values()))
+        setMediaPage(Number(mediaData.page || 1))
+        setMediaTotalPages(Number(mediaData.totalPages || 1))
+        setMediaTotalDocs(Number(mediaData.totalDocs || pageDocs.length))
+        setMediaFolders((folderData.folders || []).map((folder: { name?: unknown }) => String(folder.name || '')).filter(Boolean))
+        setEvents(eventData.docs || [])
+        if (release) {
+          const nextData: PressReleaseFormData = { title: String(release.title || ''), designerName: String(release.designerName || ''), brandName: String(release.brandName || ''), event: relationId(release.event), excerpt: String(release.excerpt || ''), body: lexicalText(release.body), bodyHtml: lexicalHtml(release.body), websiteUrl: String(release.websiteUrl || ''), instagramUrl: String(release.instagramUrl || ''), portraitImage: relationId(release.portraitImage), images: Array.isArray(release.images) ? release.images.map(relationId).filter(Boolean) : [], publishDate: localDateTime(release.publishDate), featured: Boolean(release.featured), published: Boolean(release.published) }
+          initialDataRef.current = JSON.stringify(nextData)
+          setDirty(false)
+          setData(nextData)
+        }
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load press release.'))
+      .finally(stopLoading)
+    return () => { active = false }
+  }, [id, startLoading])
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    const selectedMedia = [data.portraitImage, ...data.images].map((mediaID) => media.find((item) => item.id === mediaID))
+    if (selectedMedia.some((item) => !isPrivatePressMedia(item))) {
+      setError('Press releases can only use private AWS media. Replace any legacy image before saving.')
+      return
+    }
+    setSaving(true); setError(''); const stopLoading = startLoading(id ? 'Saving press release…' : 'Publishing press release…')
+    try {
+      const { bodyHtml, ...payload } = data
+      await api(id ? `/press-releases/${id}` : '/press-releases', { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, publishDate: data.publishDate ? new Date(data.publishDate).toISOString() : undefined, body: pressBody(data.body, bodyHtml) }) })
+      allowNavigationRef.current = true
+      router.replace('/admin/press-releases')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save press release.') } finally { setSaving(false); stopLoading() }
+  }
+  async function loadMoreMedia() {
+    if (loadingMoreMedia || mediaPage >= mediaTotalPages) return
+    setLoadingMoreMedia(true)
+    try {
+      const nextPage = mediaPage + 1
+      const response = await api(pressMediaPagePath(nextPage))
+      const nextDocs: Doc[] = (response.docs || []).map(withAdminPreviewUrl)
+      setMedia((current) => Array.from(new Map([...current, ...nextDocs].map((item) => [item.id, item])).values()))
+      setMediaPage(Number(response.page || nextPage))
+      setMediaTotalPages(Number(response.totalPages || mediaTotalPages))
+      setMediaTotalDocs(Number(response.totalDocs || mediaTotalDocs))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load more images.')
+    } finally {
+      setLoadingMoreMedia(false)
+    }
+  }
+  function toggleImage(imageId: string) { setData((current) => ({ ...current, images: current.images.includes(imageId) ? current.images.filter((item) => item !== imageId) : [...current.images, imageId] })) }
+  const privateMedia = media.filter((item) => isPrivatePressMedia(item))
+  const selectedMediaIDs = new Set([data.portraitImage, ...data.images].filter(Boolean))
+  const renderedPrivateMedia = Array.from(new Map([
+    ...privateMedia.slice(0, mediaRenderLimit),
+    ...privateMedia.filter((item) => selectedMediaIDs.has(item.id)),
+  ].map((item) => [item.id, item])).values())
+  const hasLegacySelection = [data.portraitImage, ...data.images]
+    .filter(Boolean)
+    .some((mediaID) => !isPrivatePressMedia(media.find((item) => item.id === mediaID)))
+  const field = (name: keyof PressReleaseFormData, label: string, type = 'text', required = false) => <label className="admin-form"><span>{label}{required ? ' *' : ''}</span><input type={type} required={required} value={String(data[name])} onChange={(event) => setData((current) => ({ ...current, [name]: event.target.value }))} /></label>
+  return <form className="admin-form admin-press-form" onSubmit={save}>
+    <div className="admin-page-heading"><div><p className="admin-eyebrow">EDITORIAL</p><h1>{id ? 'Edit press release' : 'New press release'}</h1><p className="admin-muted">Build a polished designer profile with the story, images, and show connection ready for publication.</p></div><div className="admin-page-heading__actions"><Link href="/admin/press-releases" className="admin-secondary">Cancel</Link><button className="admin-primary" disabled={saving || !data.portraitImage || !data.body || hasLegacySelection}>{saving ? 'Saving…' : data.published ? 'Publish profile' : 'Save draft'}</button></div></div>
+    {error ? <p className="admin-error" role="alert">{error}</p> : null}
+    {hasLegacySelection ? <p className="admin-error" role="alert">This profile still references legacy external media. Replace those images before saving.</p> : null}
+    <div className="admin-press-form__grid"><div className="admin-press-form__main">{field('title', 'Press headline', 'text', true)}{field('designerName', 'Designer name', 'text', true)}{field('brandName', 'Brand / label name')}{field('excerpt', 'Short introduction', 'text', true)}<label className="admin-form"><span>Designer write-up *</span><PressRichTextEditor value={data.bodyHtml} onChange={(bodyHtml, body) => setData((current) => ({ ...current, bodyHtml, body }))} /><input className="admin-rich-text-editor__required" required value={data.body} onChange={() => undefined} aria-label="Designer write-up" tabIndex={-1} /></label></div><div className="admin-press-form__side"><label className="admin-form"><span>Participating show</span><select value={data.event} onChange={(event) => setData((current) => ({ ...current, event: event.target.value }))}><option value="">No linked show</option>{events.map((item) => <option key={item.id} value={item.id}>{String(item.title || item.id)}</option>)}</select></label>{field('publishDate', 'Publish date', 'datetime-local')}{field('websiteUrl', 'Website URL', 'url')}{field('instagramUrl', 'Instagram URL', 'url')}<MediaChoice label="Designer portrait / hero image" required value={data.portraitImage} media={privateMedia} folderNames={mediaFolders} selectedMedia={media.find((item) => item.id === data.portraitImage)} onChange={(value) => setData((current) => ({ ...current, portraitImage: value }))} onLoadMore={loadMoreMedia} hasMore={mediaPage < mediaTotalPages} loadingMore={loadingMoreMedia} /><label className="admin-form admin-check-row"><input type="checkbox" checked={data.featured} onChange={(event) => setData((current) => ({ ...current, featured: event.target.checked }))} /><span>Feature this profile on the press page</span></label><label className="admin-form admin-check-row"><input type="checkbox" checked={data.published} onChange={(event) => setData((current) => ({ ...current, published: event.target.checked }))} /><span>Publish immediately</span></label></div></div>
+    <section className="admin-press-images">
+      <div><h2>Collection and studio images</h2><p className="admin-muted">Select additional images to show below the write-up. Selected: {data.images.length}</p></div>
+      <div className="admin-destination-picker__grid">{renderedPrivateMedia.map((image) => { const selected = data.images.includes(image.id); return <label className={`admin-destination-image ${selected ? 'is-selected' : ''}`} key={image.id}><input type="checkbox" checked={selected} onChange={() => toggleImage(image.id)} aria-label={`Select ${String(image.filename || 'image')}`} /><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} loading="lazy" decoding="async" /> : null}</span><small>{String(image.filename || image.id)}</small></label> })}</div>
+      <div className="admin-media-pagination"><span aria-live="polite">Showing {renderedPrivateMedia.length} of {privateMedia.length} loaded private AWS images ({media.length} checked)</span><div className="admin-media-pagination__actions">{privateMedia.length > mediaRenderLimit ? <button type="button" className="admin-secondary" onClick={() => setMediaRenderLimit((current) => current + 48)}>Show more loaded</button> : null}{mediaPage < mediaTotalPages ? <button type="button" className="admin-secondary" disabled={loadingMoreMedia} onClick={() => void loadMoreMedia()}>{loadingMoreMedia ? 'Loading…' : 'Load 24 more'}</button> : null}</div></div>
+      {mediaPage >= mediaTotalPages && mediaTotalDocs > 0 ? <p className="admin-media-pagination__complete">Checked all {mediaTotalDocs} media records; {privateMedia.length} are ready for Press.</p> : null}
+    </section>
+    <div className="admin-form-actions"><button className="admin-primary" disabled={saving || !data.portraitImage || !data.body || hasLegacySelection}>{saving ? 'Saving…' : data.published ? 'Publish profile' : 'Save draft'}</button></div>
+  </form>
+}
+
+function MediaChoice({ label, value, media, folderNames: configuredFolderNames = [], onChange, required = false, selectedMedia, onLoadMore, hasMore = false, loadingMore = false }: { label: string; value: string; media: Doc[]; folderNames?: string[]; onChange: (value: string) => void; required?: boolean; selectedMedia?: Doc; onLoadMore?: () => Promise<void>; hasMore?: boolean; loadingMore?: boolean }) {
   const [open, setOpen] = useState(false)
   const [folder, setFolder] = useState('')
-  const selected = media.find((image) => image.id === value)
-  const folderNames = Array.from(new Set(media.map((image) => String(image.folder || '')).filter((name) => Boolean(name) && name !== '__unsorted__'))).sort((a, b) => a.localeCompare(b))
+  const [displayLimit, setDisplayLimit] = useState(24)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  const selected = selectedMedia || media.find((image) => image.id === value)
+  const folderNames = Array.from(new Set([...configuredFolderNames, ...media.map((image) => String(image.folder || ''))].filter((name) => Boolean(name) && name !== '__unsorted__'))).sort((a, b) => a.localeCompare(b))
   const folderCards = [{ id: '__unsorted__', name: 'Unsorted' }, ...folderNames.map((name) => ({ id: name, name }))]
   const visibleMedia = media.filter((image) => folder === '__unsorted__' ? !image.folder || image.folder === '__unsorted__' : image.folder === folder)
+  const renderedMedia = Array.from(new Map([
+    ...visibleMedia.slice(0, displayLimit),
+    ...visibleMedia.filter((image) => image.id === value),
+  ].map((image) => [image.id, image])).values())
   useEffect(() => {
     if (!open) return
+    const previousActive = document.activeElement as HTMLElement | null
+    const trigger = triggerRef.current
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); setFolder('') } }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape) }
+    const focusPanel = () => panelRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus()
+    const closeOnEscapeOrTrapFocus = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); setFolder(''); return }
+      if (event.key !== 'Tab' || !panelRef.current) return
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter((element) => !element.hasAttribute('disabled'))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', closeOnEscapeOrTrapFocus)
+    const focusTimer = window.setTimeout(focusPanel, 0)
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscapeOrTrapFocus)
+      window.setTimeout(() => (trigger || previousActive)?.focus(), 0)
+    }
   }, [open])
-  function closePicker() { setOpen(false); setFolder('') }
+  function closePicker() { setOpen(false); setFolder(''); setDisplayLimit(24) }
+  function chooseFolder(nextFolder: string) { setFolder(nextFolder); setDisplayLimit(24) }
   function chooseImage(id: string) { onChange(id); closePicker() }
-  return <div className="admin-form admin-media-choice"><span>{label}{required ? ' *' : ''}</span><div className={`admin-media-choice__control ${selected ? 'has-selection' : ''}`}>{selected ? <><div className="admin-media-choice__selected-image">{selected.url ? <img src={String(selected.url)} alt={String(selected.filename || '')} /> : null}</div><div className="admin-media-choice__selected-copy"><strong>{String(selected.filename || selected.id)}</strong><small>{String(selected.folder && selected.folder !== '__unsorted__' ? selected.folder : 'Unsorted')}</small></div></> : <><span className="admin-media-choice__empty-icon"><Images size={21} /></span><div className="admin-media-choice__selected-copy"><strong>No image selected</strong><small>Choose from the media library</small></div></>}<div className="admin-media-choice__control-actions"><button type="button" className="admin-secondary" onClick={() => setOpen(true)}>{selected ? 'Change image' : 'Choose image'}</button>{selected && !required ? <button type="button" className="admin-media-choice__remove" onClick={() => onChange('')}>Remove</button> : null}</div></div>{open ? <div className="admin-media-modal" role="dialog" aria-modal="true" aria-label={`${label} picker`}><button type="button" className="admin-media-modal__backdrop" aria-label="Close image picker" onClick={closePicker} /><section className="admin-media-modal__panel"><header className="admin-media-modal__header"><div><p className="admin-eyebrow">MEDIA LIBRARY</p><h2>{label}</h2><p className="admin-muted">{folder ? `Choose one image from ${folder === '__unsorted__' ? 'Unsorted' : folder}.` : 'Choose a folder to browse its images.'}</p></div><button type="button" className="admin-icon-button admin-media-modal__close" onClick={closePicker} aria-label="Close image picker"><X size={22} /></button></header><div className="admin-media-modal__body">{folder ? <div className="admin-media-choice__toolbar"><button type="button" className="admin-secondary" onClick={() => setFolder('')}>← Back to folders</button><small>{visibleMedia.length} images</small></div> : null}{folder === '' ? <div className="admin-picker-folders">{folderCards.map((item) => <button type="button" className="admin-picker-folder" key={item.id} onClick={() => setFolder(item.id)}><FolderOpen size={20} /><strong>{item.name}</strong><small>{media.filter((image) => item.id === '__unsorted__' ? !image.folder || image.folder === '__unsorted__' : image.folder === item.id).length} images</small></button>)}</div> : visibleMedia.length ? <div className="admin-destination-picker__grid">{visibleMedia.map((image) => <button type="button" className={`admin-destination-image ${image.id === value ? 'is-selected' : ''}`} key={image.id} onClick={() => chooseImage(image.id)}><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} loading="lazy" /> : null}</span><small>{String(image.filename || image.id)}</small></button>)}</div> : <p className="admin-muted">No images in this folder yet.</p>}</div></section></div> : null}{required ? <input className="admin-media-choice__required" tabIndex={-1} required value={value} onChange={() => undefined} aria-label={label} /> : null}</div>
+  return <div className="admin-form admin-media-choice"><span>{label}{required ? ' *' : ''}</span><div className={`admin-media-choice__control ${selected ? 'has-selection' : ''}`}>{selected ? <><div className="admin-media-choice__selected-image">{selected.url ? <img src={String(selected.url)} alt={String(selected.filename || '')} loading="lazy" decoding="async" /> : null}</div><div className="admin-media-choice__selected-copy"><strong>{String(selected.filename || selected.id)}</strong><small>{String(selected.folder && selected.folder !== '__unsorted__' ? selected.folder : 'Unsorted')}</small></div></> : <><span className="admin-media-choice__empty-icon"><Images size={21} /></span><div className="admin-media-choice__selected-copy"><strong>No image selected</strong><small>Choose from the media library</small></div></>}<div className="admin-media-choice__control-actions"><button ref={triggerRef} type="button" className="admin-secondary" onClick={() => setOpen(true)}>{selected ? 'Change image' : 'Choose image'}</button>{selected && !required ? <button type="button" className="admin-media-choice__remove" onClick={() => onChange('')}>Remove</button> : null}</div></div>{open ? <div className="admin-media-modal" role="dialog" aria-modal="true" aria-label={`${label} picker`}><button type="button" className="admin-media-modal__backdrop" aria-label="Close image picker" onClick={closePicker} /><section ref={panelRef} className="admin-media-modal__panel"><header className="admin-media-modal__header"><div><p className="admin-eyebrow">MEDIA LIBRARY</p><h2>{label}</h2><p className="admin-muted">{folder ? `Choose one image from ${folder === '__unsorted__' ? 'Unsorted' : folder}.` : 'Choose a folder to browse its images.'}</p></div><button type="button" className="admin-icon-button admin-media-modal__close" onClick={closePicker} aria-label="Close image picker"><X size={22} /></button></header><div className="admin-media-modal__body">{folder ? <div className="admin-media-choice__toolbar"><button type="button" className="admin-secondary" onClick={() => chooseFolder('')}>← Back to folders</button><small>{visibleMedia.length ? `${renderedMedia.length} of ${visibleMedia.length} images shown` : 'Images available; load more to browse them.'}</small></div> : null}{folder === '' ? <div className="admin-picker-folders">{folderCards.map((item) => <button type="button" className="admin-picker-folder" key={item.id} onClick={() => chooseFolder(item.id)}><FolderOpen size={20} /><strong>{item.name}</strong><small>{media.filter((image) => item.id === '__unsorted__' ? !image.folder || image.folder === '__unsorted__' : image.folder === item.id).length || 'Images available'}</small></button>)}</div> : visibleMedia.length ? <div className="admin-destination-picker__grid">{renderedMedia.map((image) => <button type="button" className={`admin-destination-image ${image.id === value ? 'is-selected' : ''}`} key={image.id} onClick={() => chooseImage(image.id)}><span className="admin-destination-image__preview">{image.url ? <img src={String(image.url)} alt={String(image.filename || '')} loading="lazy" decoding="async" /> : null}</span><small>{String(image.filename || image.id)}</small></button>)}</div> : <p className="admin-muted">No private AWS images loaded in this folder yet. Use “Load 24 more” to browse it.</p>}{folder && visibleMedia.length > displayLimit ? <div className="admin-media-pagination"><span>More loaded images are hidden for performance.</span><button type="button" className="admin-secondary" onClick={() => setDisplayLimit((current) => current + 24)}>Show more loaded</button></div> : null}{hasMore && onLoadMore ? <div className="admin-media-pagination"><span>More media is available.</span><button type="button" className="admin-secondary" disabled={loadingMore} onClick={() => void onLoadMore()}>{loadingMore ? 'Loading…' : 'Load 24 more'}</button></div> : null}</div></section></div> : null}{required ? <input className="admin-media-choice__required" tabIndex={-1} required value={value} onChange={() => undefined} aria-label={label} /> : null}</div>
 }
 
 type DestinationImage = string | { id: string; filename?: string; url?: string }
@@ -601,8 +992,9 @@ function AdminAppContent({ section }: { section?: string[] }) {
   // whole page here made every navigation look like a reload.
   const isNewEvent = slug === 'events' && section?.[1] === 'new'
   const isNewGallery = slug === 'galleries' && section?.[1] === 'new'
+  const isNewPressRelease = slug === 'press-releases' && section?.[1] === 'new'
   const recordId = section?.[1] && section[1] !== 'new' ? section[1] : undefined
-  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{isNewEvent ? <EventForm /> : recordId && slug === 'events' ? <EventForm id={recordId} /> : isNewGallery ? <GalleryForm /> : recordId && slug ? <RecordDetailPage slug={slug} id={recordId} /> : !slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
+  return <div className="admin-shell"><Sidebar open={open} close={() => setOpen(false)} /><div className="admin-main"><header className="admin-topbar"><button className="admin-icon-button admin-menu" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={21} /></button><div><span className="admin-topbar__crumb">LA Fashion Closet</span>{slug ? <><ChevronRight size={14} /><span>{labels[slug] || slug}</span></> : <><ChevronRight size={14} /><span>Overview</span></>}</div><Link href="/" className="admin-topbar__home">Visit site</Link></header><main className="admin-content">{isNewEvent ? <EventForm /> : recordId && slug === 'events' ? <EventForm id={recordId} /> : isNewGallery ? <GalleryForm /> : isNewPressRelease ? <PressReleaseForm /> : recordId && slug === 'press-releases' ? <PressReleaseForm id={recordId} /> : recordId && slug ? <RecordDetailPage slug={slug} id={recordId} /> : !slug ? <Overview /> : slug === 'media' ? <MediaPage /> : slug === 'home-destinations' ? <HomeDestinationsPage /> : <CollectionPage slug={slug} />}</main></div>{open ? <button className="admin-backdrop" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}</div>
 }
 
 export function AdminApp({ section }: { section?: string[] }) {

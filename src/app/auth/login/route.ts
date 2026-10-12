@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 
 const backendUrl = (process.env.PAYLOAD_BACKEND_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
 
-function normalizeAuthCookie(value: string, hostname: string): string {
+function normalizeAuthCookie(value: string, hostname: string, secureRequest: boolean): string {
   // Payload's serializer can emit boolean cookie attributes as
   // `Secure=true` and `HttpOnly=true`, while browsers expect both attributes
   // to be flags. Normalize them before returning the cookie from this
@@ -10,6 +10,15 @@ function normalizeAuthCookie(value: string, hostname: string): string {
   let cookie = value
     .replace(/;\s*Secure(?:=true)?(?=;|$)/gi, '; Secure')
     .replace(/;\s*HttpOnly(?:=true)?(?=;|$)/gi, '; HttpOnly')
+
+  // A local frontend can proxy a backend that was started with production
+  // defaults. Browsers reject Secure/domain cookies on http://localhost, so
+  // keep the session host-only and non-secure for local HTTP requests.
+  if (!secureRequest) {
+    cookie = cookie
+      .replace(/;\s*Secure(?=;|$)/gi, '')
+      .replace(/;\s*Domain=[^;]*/gi, '')
+  }
 
   // Keep the session available on both the apex and www hostnames in
   // production. Do not add a production domain when running locally.
@@ -41,7 +50,10 @@ export async function POST(request: NextRequest) {
   const fallbackCookie = response.headers.get('set-cookie')
   const cookies = setCookies.length ? setCookies : fallbackCookie ? [fallbackCookie] : []
   for (const cookie of cookies) {
-    headers.append('set-cookie', normalizeAuthCookie(cookie, request.nextUrl.hostname))
+    headers.append(
+      'set-cookie',
+      normalizeAuthCookie(cookie, request.nextUrl.hostname, request.nextUrl.protocol === 'https:'),
+    )
   }
 
   return new Response(await response.arrayBuffer(), {

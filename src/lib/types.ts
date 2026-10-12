@@ -14,6 +14,11 @@ export type LexicalNode = {
   format?: number | string
   tag?: string
   url?: string
+  fields?: {
+    url?: string
+    linkType?: string
+    newTab?: boolean
+  }
   listType?: string
   children?: LexicalNode[]
 }
@@ -57,6 +62,23 @@ export type GalleryItem = {
   event?: EventItem | string | null
   /** hasMany Media docs, IDs, or legacy { image, caption } rows */
   images?: (Media | string | GalleryImage)[] | null
+}
+
+export type PressReleaseItem = {
+  id: string
+  title: string
+  slug: string
+  designerName: string
+  brandName?: string | null
+  excerpt: string
+  body?: LexicalContent
+  portraitImage?: Media | string | null
+  images?: (Media | string)[] | null
+  event?: EventItem | string | null
+  websiteUrl?: string | null
+  instagramUrl?: string | null
+  publishDate?: string | null
+  featured?: boolean | null
 }
 
 export type PayloadListResponse<T> = {

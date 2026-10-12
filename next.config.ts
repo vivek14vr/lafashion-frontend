@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
     localPatterns: [
       {
         pathname: '/api/media/**',
-        search: '?prefix=lafashioncloset',
       },
     ],
     remotePatterns: [
