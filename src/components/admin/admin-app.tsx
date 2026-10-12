@@ -127,6 +127,12 @@ function withAdminPreviewUrl(doc: Doc): Doc {
 
   try {
     const url = new URL(rawUrl)
+    if (url.pathname.startsWith('/api/media/file/')) {
+      // Payload's protected file route may be serialized with the backend,
+      // apex, www, or an EC2 hostname. Always preview it through this app's
+      // same-origin proxy so local and production admin sessions work alike.
+      return { ...doc, url: `${url.pathname}${url.search}` }
+    }
     if (url.hostname === 'res.cloudinary.com' && url.pathname.includes('/image/upload/')) {
       url.pathname = url.pathname.replace(
         '/image/upload/',
@@ -146,6 +152,7 @@ function isPrivatePressMedia(doc: Doc | undefined): boolean {
   try {
     const rawURL = doc.url.trim()
     const url = new URL(rawURL, window.location.origin)
+    if (url.pathname.startsWith('/api/media/file/')) return true
     const isRelativePayloadFile = rawURL.startsWith('/api/media/file/')
     const isTrustedPayloadFile = url.pathname.startsWith('/api/media/file/') && (
       isRelativePayloadFile ||
