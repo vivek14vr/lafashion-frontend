@@ -564,7 +564,7 @@ function PressRichTextEditor({ value, onChange }: { value: string; onChange: (ht
     editorRef.current?.focus()
     document.execCommand(commandName, false, commandValue)
     const html = editorRef.current?.innerHTML || ''
-    onChange(html, lexicalText(htmlToLexical(html)))
+    onChange(html, lexicalText(htmlToLexical(html)) || editorRef.current?.innerText || editorRef.current?.textContent || '')
     setActiveFormat(activeKey)
   }
   return <div className="admin-rich-text-editor">
@@ -575,7 +575,7 @@ function PressRichTextEditor({ value, onChange }: { value: string; onChange: (ht
       <button type="button" className={activeFormat === 'insertUnorderedList' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('insertUnorderedList')} aria-label="Bulleted list" aria-pressed={activeFormat === 'insertUnorderedList'}>•</button>
       <button type="button" className={activeFormat === 'paragraph' ? 'is-active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => command('formatBlock', 'p', 'paragraph')} aria-label="Paragraph" aria-pressed={activeFormat === 'paragraph'}>¶</button>
     </div>
-    <div ref={editorRef} className="admin-rich-text-editor__input" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="Designer write-up" onInput={(event) => { const html = event.currentTarget.innerHTML; onChange(html, lexicalText(htmlToLexical(html))) }} />
+    <div ref={editorRef} className="admin-rich-text-editor__input" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="Designer write-up" onInput={(event) => { const html = event.currentTarget.innerHTML; onChange(html, lexicalText(htmlToLexical(html)) || event.currentTarget.innerText || event.currentTarget.textContent || '') }} />
     <p className="admin-rich-text-editor__hint">Use the formatting buttons to structure the story. Links can be pasted into the editor.</p>
   </div>
 }
@@ -724,13 +724,15 @@ function PressReleaseForm({ id }: { id?: string }) {
     // the visible write-up and submitted payload cannot diverge.
     const editor = event.currentTarget.querySelector<HTMLElement>('[contenteditable="true"]')
     const editorHtml = editor?.innerHTML || data.bodyHtml
-    const editorText = typeof document !== 'undefined' ? lexicalText(htmlToLexical(editorHtml)).trim() : ''
+    const parsedEditorText = typeof document !== 'undefined' ? lexicalText(htmlToLexical(editorHtml)).trim() : ''
+    const editorPlainText = editor?.innerText?.trim() || editor?.textContent?.trim() || ''
+    const editorText = parsedEditorText || editorPlainText
     const bodyText = editorText || data.body.trim()
     if (!bodyText) {
       setError('Designer write-up is required.')
       return
     }
-    const bodyHtml = editorText ? editorHtml : undefined
+    const bodyHtml = parsedEditorText ? editorHtml : undefined
     setSaving(true); setError(''); const stopLoading = startLoading(id ? 'Saving press release…' : 'Publishing press release…')
     try {
       const { bodyHtml: ignoredBodyHtml, ...payload } = data
