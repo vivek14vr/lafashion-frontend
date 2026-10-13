@@ -61,18 +61,11 @@ export function getPressMediaUrl(media?: Media | string | null): string | null {
   try {
     const rawURL = media.url.trim()
     const parsed = new URL(rawURL, 'http://payload.local')
-    const trustedHosts = new Set(['payload.local', 'localhost', '127.0.0.1'])
-    for (const candidate of [SERVER_API_URL, PUBLIC_API_URL]) {
-      try {
-        trustedHosts.add(new URL(candidate).hostname)
-      } catch {
-        // Ignore malformed optional URLs and keep the safe defaults.
-      }
-    }
     const isRelativePayloadFile = rawURL.startsWith('/api/media/file/')
-    const isPayloadFile =
-      parsed.pathname.startsWith('/api/media/file/') &&
-      (isRelativePayloadFile || trustedHosts.has(parsed.hostname))
+    // Payload can serialize its private file URL with the backend hostname,
+    // the public frontend hostname, or an EC2 hostname. The host is discarded
+    // below; only the protected Payload path is proxied through this origin.
+    const isPayloadFile = isRelativePayloadFile || parsed.pathname.startsWith('/api/media/file/')
     const isS3Object = parsed.hostname.endsWith('.amazonaws.com')
     if (!isPayloadFile && !isS3Object) return null
 

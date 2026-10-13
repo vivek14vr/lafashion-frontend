@@ -42,6 +42,7 @@ export async function middleware(request: NextRequest) {
     } catch {
       // Fail closed if the auth service is unavailable. Never render an admin
       // route when the server cannot verify the session.
+      if (isLoginRoute) return NextResponse.next()
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
       return NextResponse.redirect(loginUrl)
