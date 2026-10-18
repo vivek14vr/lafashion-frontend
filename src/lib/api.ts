@@ -120,8 +120,8 @@ function appendEventSearch(query: URLSearchParams, search: string | undefined, a
 export async function getUpcomingEvents(options?: EventListOptions) {
   const page = options?.page ?? 1
   const limit = options?.limit ?? 20
-  const now = new Date().toISOString()
-  // Filter by date (not stored status) so past dates never appear as upcoming
+  const now = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  // Filter by the derived six-hour end time so an event remains upcoming until it ends.
   const query = new URLSearchParams({
     'where[and][0][date][greater_than_equal]': now,
     'where[and][1][_status][equals]': 'published',
@@ -138,7 +138,7 @@ export async function getUpcomingEvents(options?: EventListOptions) {
 export async function getPastEvents(options?: EventListOptions) {
   const page = options?.page ?? 1
   const limit = options?.limit ?? 20
-  const now = new Date().toISOString()
+  const now = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
   const query = new URLSearchParams({
     'where[and][0][date][less_than]': now,
     'where[and][1][_status][equals]': 'published',
@@ -198,8 +198,8 @@ export async function getGalleries(options?: { page?: number; limit?: number; se
 }
 
 /** Prefer live date over stored status (status can lag until a document is re-saved). */
-export function isEventPast(event: Pick<EventItem, 'date' | 'status'>) {
-  const t = new Date(event.date).getTime()
+export function isEventPast(event: Pick<EventItem, 'date' | 'endDate' | 'status'>) {
+  const t = new Date(event.endDate || new Date(new Date(event.date).getTime() + 6 * 60 * 60 * 1000)).getTime()
   if (!Number.isNaN(t)) return t < Date.now()
   return event.status === 'past'
 }
@@ -264,7 +264,7 @@ export async function getPressReleaseBySlug(slug: string) {
   return data.docs[0] ?? null
 }
 
-export function formatEventDate(date: string, endDate?: string | null) {
+export function formatEventDate(date: string) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'long',
@@ -274,14 +274,7 @@ export function formatEventDate(date: string, endDate?: string | null) {
     minute: '2-digit',
     timeZone: 'UTC',
   }).format(new Date(date))
-  if (!endDate) return formatter
-
-  const endFormatter = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  }).format(new Date(endDate))
-  return `${formatter} – ${endFormatter}`
+  return formatter
 }
 
 export type RegistrationPayload = {

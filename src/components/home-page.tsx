@@ -78,7 +78,7 @@ export function HomePage({ destinations }: { destinations: DestinationWithImages
               <div className="mt-5 flex flex-col gap-2 text-sm text-[var(--muted)]">
                 <span className="inline-flex items-center gap-2">
                   <CalendarDays size={15} />
-                  {formatEventDate(featured.date, featured.endDate)}
+                  {formatEventDate(featured.date)}
                 </span>
                 <span className="inline-flex items-center gap-2">
                   <MapPin size={15} />
