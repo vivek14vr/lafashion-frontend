@@ -174,6 +174,20 @@ function localDateTime(value: unknown): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
+function floatingEventDateTime(value: unknown): string {
+  if (!value) return ''
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return ''
+  // Event date fields are floating wall-clock values stored in UTC so every
+  // admin and visitor sees the same clock time regardless of their timezone.
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
+}
+
+function eventDateToUtc(value: string): string {
+  return new Date(`${value}:00Z`).toISOString()
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`/api${path}`, { ...init, credentials: 'include', cache: 'no-store' })
   const body = await response.json().catch(() => null)
@@ -403,7 +417,7 @@ function EventForm({ id }: { id?: string }) {
         setMedia(mediaResponse.docs || [])
         if (event) setData({
           title: String(event.title || ''),
-          date: localDateTime(event.date),
+          date: floatingEventDateTime(event.date),
           venue: String(event.venue || ''),
           excerpt: String(event.excerpt || ''),
           ticketUrl: String(event.ticketUrl || ''),
@@ -418,7 +432,7 @@ function EventForm({ id }: { id?: string }) {
   async function save(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(''); const stopLoading = startLoading(id ? 'Saving event…' : 'Publishing event…')
     try {
-      await api(id ? `/events/${id}` : '/events', { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, _status: 'published' }) })
+      await api(id ? `/events/${id}` : '/events', { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, date: eventDateToUtc(data.date), _status: 'published' }) })
       router.replace('/admin/events')
     } catch (err) { setError(err instanceof Error ? err.message : `Could not ${id ? 'save' : 'create'} event.`) } finally { setSaving(false); stopLoading() }
   }

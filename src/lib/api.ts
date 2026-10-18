@@ -264,15 +264,24 @@ export async function getPressReleaseBySlug(slug: string) {
   return data.docs[0] ?? null
 }
 
-export function formatEventDate(date: string) {
-  return new Intl.DateTimeFormat('en-US', {
+export function formatEventDate(date: string, endDate?: string | null) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'UTC',
   }).format(new Date(date))
+  if (!endDate) return formatter
+
+  const endFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(endDate))
+  return `${formatter} – ${endFormatter}`
 }
 
 export type RegistrationPayload = {

@@ -75,7 +75,7 @@ export function EventCard({ event, index = 0 }: { event: EventItem; index?: numb
         <div className="mt-5 flex flex-col gap-2 text-sm text-[var(--muted)]">
           <span className="inline-flex items-center gap-2">
             <CalendarDays size={15} className="text-[var(--champagne)]" />
-            {formatEventDate(event.date)}
+            {formatEventDate(event.date, event.endDate)}
           </span>
           <span className="inline-flex items-center gap-2">
             <MapPin size={15} className="text-[var(--champagne)]" />

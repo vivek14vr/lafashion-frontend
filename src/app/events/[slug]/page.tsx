@@ -100,7 +100,7 @@ export default async function EventDetailPage({ params }: Props) {
           <div className="flex flex-col gap-3 text-sm text-[var(--muted)]">
             <span className="inline-flex items-center gap-2">
               <CalendarDays size={16} />
-              {formatEventDate(event.date)}
+              {formatEventDate(event.date, event.endDate)}
             </span>
             <span className="inline-flex items-center gap-2">
               <MapPin size={16} />

@@ -34,6 +34,7 @@ export type EventItem = {
   title: string
   slug: string
   date: string
+  endDate?: string | null
   venue: string
   excerpt: string
   ticketUrl?: string | null

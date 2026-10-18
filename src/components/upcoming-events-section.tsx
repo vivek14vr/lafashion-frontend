@@ -56,7 +56,7 @@ function UpcomingEventCard({ event, index }: { event: EventItem; index: number }
             <div className="flex flex-col items-center gap-1.5 text-xs text-[var(--cream)]/75 sm:text-sm">
               <span className="inline-flex items-center gap-2">
                 <CalendarDays size={14} className="text-[var(--champagne)]" />
-                {formatEventDate(event.date)}
+                {formatEventDate(event.date, event.endDate)}
               </span>
               <span className="inline-flex items-center gap-2">
                 <MapPin size={14} className="text-[var(--champagne)]" />
